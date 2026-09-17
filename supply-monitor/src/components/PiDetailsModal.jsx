@@ -24,7 +24,7 @@ const PiDetailsModal = ({ selectedPiSegment, setSelectedPiSegment, chartData, vi
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setSelectedPiSegment(null)}>
-      <div className="bg-white w-full max-w-4xl max-h-[80vh] rounded-[32px] shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-4xl max-h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
             <h3 className={`text-xl font-black flex items-center gap-2 ${colorClass}`}><Package />{title}</h3>

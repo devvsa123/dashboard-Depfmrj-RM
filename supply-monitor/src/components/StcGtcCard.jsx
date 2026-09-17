@@ -11,7 +11,7 @@ const StcGtcCard = ({ stcGtcAnalysis }) => {
   const { groups, hasData } = stcGtcAnalysis;
 
   return (
-    <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-200">
+    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
       <div className="flex items-center gap-2 mb-6">
         <Clock className="text-indigo-500" size={20} />
         <h3 className="text-lg font-black text-slate-800">Tempo Total do Processo: STC x GTC</h3>

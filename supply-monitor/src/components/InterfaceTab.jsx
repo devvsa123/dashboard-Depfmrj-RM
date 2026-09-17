@@ -21,7 +21,7 @@ const InterfaceTab = ({
       : currentList;
   return (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-      <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex-1">
           <h3 className="text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2 mb-1"><Calendar size={16} className="text-indigo-500" /> Filtro de Período (Arrecadados OMS)</h3>
           <p className="text-xs text-slate-500 font-medium">
@@ -51,7 +51,7 @@ const InterfaceTab = ({
           </div>
         ))}
       </div>
-      <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
          <div className="flex justify-between items-center mb-6">
            <h3 className={`text-xl font-black flex items-center gap-2 ${views[activeInterfaceView].color}`}><ArrowRightLeft size={24} /> {views[activeInterfaceView].title}</h3>
            <button onClick={() => handleDownloadExcel(displayedList, `Interface_${activeInterfaceView}`)} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-indigo-100 transition-colors shadow-sm"><Download size={16} /> Exportar Excel</button>

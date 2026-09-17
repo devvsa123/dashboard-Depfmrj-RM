@@ -1,4 +1,5 @@
 import { CheckCircle2, AlertTriangle, OctagonAlert } from 'lucide-react';
+import InfoButton from './InfoButton';
 
 const CONFIG = {
   good: {
@@ -34,8 +35,14 @@ const HealthBanner = ({ health, alerts }) => {
         <Icon className={cfg.text} size={26} />
         {health !== 'good' && <span className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full ${cfg.dot} animate-pulse border-2 border-white`} />}
       </div>
-      <div>
-        <p className={`text-base font-black ${cfg.text}`}>{cfg.label}</p>
+      <div className="flex-1">
+        <div className="flex items-center gap-1.5">
+          <p className={`text-base font-black ${cfg.text}`}>{cfg.label}</p>
+          <InfoButton
+            title="Como calculamos"
+            description="Comparamos o Nível de Serviço, a idade da fila, o pedido mais antigo e as divergências entre WMS e SINGRA com as metas cadastradas em 'Metas e Progresso'. Verde: tudo dentro da meta. Amarelo: pelo menos um indicador abaixo da meta. Vermelho: pelo menos um indicador muito abaixo da meta."
+          />
+        </div>
         <p className="text-sm text-slate-500 font-medium">{description}</p>
       </div>
     </div>

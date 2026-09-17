@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Target, Settings2, Check } from 'lucide-react';
+import InfoButton from './InfoButton';
 
 const STATUS_COLOR = {
   good: { bar: 'bg-emerald-500', text: 'text-emerald-600' },
@@ -45,11 +46,15 @@ const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, oldest }) => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
           <Target className="text-indigo-500" size={20} />
           <h3 className="text-lg font-black text-slate-800">Metas e Progresso</h3>
+          <InfoButton
+            title="Como funciona"
+            description="Cada barra compara o valor atual com a meta definida abaixo. Barra cheia e verde significa que a meta foi atingida; quanto mais vazia e mais para o vermelho, mais distante estamos do combinado. Você pode ajustar as metas a qualquer momento em 'Editar metas'."
+          />
         </div>
         {isEditing ? (
           <button onClick={saveEditing} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors">
@@ -65,7 +70,7 @@ const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, oldest }) => {
       {isEditing ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="block">
-            <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">Meta de SLA (%)</span>
+            <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">Meta de Nível de Serviço (%)</span>
             <input type="number" value={draft.slaTarget} onChange={e => setDraft(d => ({ ...d, slaTarget: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
           </label>
           <label className="block">

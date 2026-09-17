@@ -73,7 +73,7 @@ const App = () => {
                   {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />} Sincronizar Robôs
                 </button>
                 <label className="px-6 py-2.5 rounded-xl font-bold bg-white border border-slate-200 shadow-sm flex items-center gap-2 hover:border-indigo-500 hover:text-indigo-600 transition-all text-sm cursor-pointer active:scale-95">
-                  <Upload size={18} /> {fileName || "Upload Manual"}
+                  <Upload size={18} /> {fileName || "Enviar Planilha"}
                   <input type="file" className="hidden" onChange={handleFileUpload} />
                 </label>
               </div>
@@ -129,6 +129,11 @@ const App = () => {
               onNavigate={setActiveTab}
               goals={goals}
               updateGoals={updateGoals}
+              yoyAnalysis={yoyAnalysis.yoyAnalysis}
+              selectedYoyYears={yoyAnalysis.selectedYoyYears}
+              toggleYoyYear={yoyAnalysis.toggleYoyYear}
+              yoyMetrics={yoyAnalysis.yoyMetrics}
+              setYoyMetrics={yoyAnalysis.setYoyMetrics}
             />
           ) : activeTab === 'backlog' ? (
             <BacklogTab
@@ -144,11 +149,6 @@ const App = () => {
               bucketSearchTerm={bucketSearchTerm}
               setBucketSearchTerm={setBucketSearchTerm}
               handleDownloadExcel={downloadExcel}
-              yoyAnalysis={yoyAnalysis.yoyAnalysis}
-              selectedYoyYears={yoyAnalysis.selectedYoyYears}
-              toggleYoyYear={yoyAnalysis.toggleYoyYear}
-              yoyMetrics={yoyAnalysis.yoyMetrics}
-              setYoyMetrics={yoyAnalysis.setYoyMetrics}
             />
           ) : activeTab === 'interface' ? (
             <InterfaceTab
@@ -179,7 +179,7 @@ const App = () => {
           ) : null
         ) : (
           <div className="mt-32 text-center flex flex-col items-center animate-pulse">
-             <div className={`w-40 h-40 bg-white rounded-[50px] shadow-2xl flex items-center justify-center mb-8 border border-slate-100`}>
+             <div className={`w-40 h-40 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-8 border border-slate-100`}>
                {loading ? <Loader2 size={60} className="text-indigo-500 animate-spin" /> : <Database size={60} className="text-indigo-500 opacity-20" />}
              </div>
              <h2 className="text-2xl font-black text-slate-800 tracking-tight">Supply Monitor Integrado</h2>

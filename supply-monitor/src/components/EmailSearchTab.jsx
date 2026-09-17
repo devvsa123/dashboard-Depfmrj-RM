@@ -7,7 +7,7 @@ const EmailSearchTab = ({
 }) => {
   return (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-      <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <Search className="text-indigo-500" size={20} />
           <h3 className="text-lg font-black text-slate-800">Extrator de RM por E-mail</h3>
@@ -17,7 +17,7 @@ const EmailSearchTab = ({
         {savedSearches.length > 0 && (
           <div className="mb-6 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Bookmark size={14} /> Sitreps Salvos
+              <Bookmark size={14} /> Consultas Salvas
             </p>
             <div className="flex flex-wrap gap-2">
               {savedSearches.map(s => (
@@ -84,7 +84,7 @@ const EmailSearchTab = ({
             ))}
           </div>
 
-          <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm">
+          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
               <h3 className="text-lg font-black text-slate-800">Resultados Encontrados ({extractedOrders.length})</h3>
 

@@ -1,11 +1,10 @@
-import { Fragment } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   Bar, BarChart, PieChart, Pie, Cell
 } from 'recharts';
 import {
   CheckCircle2, ListFilter, X, Network, Hourglass, Clock, AlertTriangle,
-  Calendar, Activity, Download
+  Activity, Download
 } from 'lucide-react';
 import { getStatusColor } from '../constants';
 import InfoButton from './InfoButton';
@@ -14,12 +13,11 @@ import BucketDetailsModal from './BucketDetailsModal';
 const BacklogTab = ({
   backlogAnalysis, backlogStartDate, setBacklogStartDate, backlogEndDate, setBacklogEndDate,
   backlogTypeFilter, setBacklogTypeFilter, selectedBucket, setSelectedBucket,
-  bucketSearchTerm, setBucketSearchTerm, handleDownloadExcel,
-  yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics
+  bucketSearchTerm, setBucketSearchTerm, handleDownloadExcel
 }) => {
   // 1. Extraímos o painel de controles para ele NUNCA sumir da tela
   const controlsPanel = (
-    <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm flex flex-col xl:flex-row items-center justify-between gap-6 mb-6">
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col xl:flex-row items-center justify-between gap-6 mb-6">
       <div className="flex-1">
         <h3 className="text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-2 mb-1">
           <ListFilter size={16} className="text-indigo-500" /> Controles da Fila (Backlog)
@@ -95,7 +93,7 @@ const BacklogTab = ({
       {controlsPanel}
 
       {/* NOVO: RESUMO DO STATUS SINGRA DA FILA */}
-      <div className="bg-white p-8 rounded-[40px] border border-slate-200 mb-6 shadow-sm">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 mb-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <Network className="text-indigo-500" size={20} />
           <h3 className="text-lg font-black text-slate-800">Status no SINGRA (Backlog Atual)</h3>
@@ -114,7 +112,7 @@ const BacklogTab = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-[32px] border border-slate-200 flex flex-col justify-between h-40">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 flex flex-col justify-between h-40">
           <div className="flex items-center justify-between">
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-2"><Hourglass size={14} /> Total em Aberto</p>
             <InfoButton title="Volume em Aberto" description="Quantidade de pedidos pendentes no fluxo (considerando o filtro selecionado)." />
@@ -122,15 +120,15 @@ const BacklogTab = ({
           <p className="text-4xl font-black text-slate-800">{backlogAnalysis.totalPending}</p>
           <p className="text-xs text-slate-400 font-medium">{backlogStartDate || backlogEndDate || backlogTypeFilter !== "TODOS" ? "Visão filtrada" : "Visão histórica total"}</p>
         </div>
-        <div className="bg-white p-8 rounded-[32px] border border-slate-200 flex flex-col justify-between h-40">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 flex flex-col justify-between h-40">
           <div className="flex items-center justify-between">
              <p className="text-orange-400 text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-2"><Clock size={14} /> Idade Média da Fila</p>
-             <InfoButton title="Aging Médio" description="Média de dias de espera dos pedidos que ainda estão abertos no filtro atual." />
+             <InfoButton title="Envelhecimento Médio" description="Média de dias de espera dos pedidos que ainda estão abertos no filtro atual." />
           </div>
           <p className="text-4xl font-black text-orange-600">{backlogAnalysis.avgAge} <span className="text-lg text-slate-400">dias</span></p>
           <p className="text-xs text-slate-400 font-medium">Tempo médio de fila</p>
         </div>
-        <div className="bg-white p-8 rounded-[32px] border border-slate-200 flex flex-col justify-between h-40 relative overflow-hidden">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 flex flex-col justify-between h-40 relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex items-center justify-between">
               <p className="text-red-400 text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-2"><AlertTriangle size={14} /> Pedido Mais Antigo</p>
@@ -142,86 +140,11 @@ const BacklogTab = ({
         </div>
       </div>
 
-      {/* NOVO GRÁFICO: SAZONALIDADE ANUAL (YoY) */}
-      <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-200 mt-6 mb-6">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <Calendar className="text-indigo-500" size={24} />
-              <h3 className="text-lg font-black text-slate-800">Sazonalidade e Comportamento Anual (YoY)</h3>
-              <InfoButton title="Sazonalidade" description="Sobreponha os anos para identificar tendências operacionais idênticas ao longo de meses específicos. Entradas são tracejadas; Saídas são sólidas." />
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            {/* Filtro de Métricas */}
-            <div className="flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-              <button
-                onClick={() => setYoyMetrics(m => ({ ...m, entradas: !m.entradas }))}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${yoyMetrics.entradas ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}
-              >
-                Entradas (Tracejado)
-              </button>
-              <button
-                onClick={() => setYoyMetrics(m => ({ ...m, saidas: !m.saidas }))}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${yoyMetrics.saidas ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-400'}`}
-              >
-                Saídas (Sólido)
-              </button>
-            </div>
-
-            {/* Filtro de Anos (Gerado dinamicamente) */}
-            <div className="flex flex-wrap items-center gap-2">
-              {yoyAnalysis.availableYears.map(year => (
-                <button
-                  key={year}
-                  onClick={() => toggleYoyYear(year)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${selectedYoyYears.includes(year) ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={yoyAnalysis.chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="monthName" tick={{fontSize: 10, fontWeight: 700}} axisLine={false} />
-              <YAxis tick={{fontSize: 10}} axisLine={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-              />
-              <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: '11px', paddingBottom: '20px', fontWeight: 600 }} />
-
-              {selectedYoyYears.map((year, idx) => {
-                // Paleta de cores para não misturar os anos
-                const colors = ['#6366f1', '#f59e0b', '#10b981', '#ec4899', '#0ea5e9', '#8b5cf6'];
-                const color = colors[idx % colors.length];
-
-                return (
-                  <Fragment key={year}>
-                    {yoyMetrics.entradas && (
-                      <Line type="monotone" dataKey={`${year}_entradas`} name={`Entradas ${year}`} stroke={color} strokeWidth={2.5} strokeDasharray="6 6" dot={{r: 3, fill: color}} activeDot={{r: 6}} />
-                    )}
-                    {yoyMetrics.saidas && (
-                      <Line type="monotone" dataKey={`${year}_saidas`} name={`Saídas ${year}`} stroke={color} strokeWidth={3} dot={{r: 4, fill: color}} activeDot={{r: 7}} />
-                    )}
-                  </Fragment>
-                );
-              })}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-[40px] border border-slate-200">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200">
           <div className="flex items-center justify-between mb-6">
              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2"><Activity className="text-indigo-500" /> Pedidos em processamento (Fila de Espera)</h3>
-             <InfoButton title="Aging por Status" description="Distribuição dos pedidos pendentes por tempo de abertura. Clique nas barras para listar detalhes." />
+             <InfoButton title="Distribuição por Envelhecimento" description="Distribuição dos pedidos pendentes por tempo de abertura. Clique nas barras para listar detalhes." />
           </div>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -245,7 +168,7 @@ const BacklogTab = ({
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="bg-white p-8 rounded-[40px] border border-slate-200">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200">
           <div className="flex items-center justify-between mb-6">
              <h3 className="text-lg font-black text-slate-800 flex items-center gap-2"><ListFilter className="text-indigo-500" /> Onde estão parados?</h3>
              <InfoButton title="Status Operacional" description="Distribuição dos pedidos pendentes pelas etapas do WMS." />
@@ -275,7 +198,7 @@ const BacklogTab = ({
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-[40px] border border-slate-200">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200">
          <div className="flex items-center justify-between mb-6">
            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-500" /> Top 10 Pedidos Críticos (Fila de Espera)</h3>
            <button

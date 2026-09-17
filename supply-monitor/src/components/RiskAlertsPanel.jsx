@@ -1,4 +1,5 @@
 import { AlertTriangle, OctagonAlert, CheckCircle2, ChevronRight } from 'lucide-react';
+import InfoButton from './InfoButton';
 
 const SEVERITY_CONFIG = {
   critical: { icon: OctagonAlert, bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700', badge: 'bg-red-600' },
@@ -9,10 +10,14 @@ const SEVERITY_CONFIG = {
 // responder "no que eu preciso agir hoje?" sem precisar garimpar as abas.
 const RiskAlertsPanel = ({ alerts, onNavigate }) => {
   return (
-    <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
+    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <AlertTriangle className="text-indigo-500" size={20} />
         <h3 className="text-lg font-black text-slate-800">Riscos e Alertas</h3>
+        <InfoButton
+          title="Crítico x Atenção"
+          description="Atenção: o indicador já ficou abaixo da meta. Crítico: está muito abaixo da meta (o dobro de distância, ou mais) e pede ação imediata. Clique em qualquer item para ir direto à aba onde o problema aparece em detalhe."
+        />
       </div>
 
       {alerts.length === 0 ? (
