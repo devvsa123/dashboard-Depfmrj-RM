@@ -1,6 +1,6 @@
 import {
   Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ComposedChart, Bar, Brush, Area, PieChart, Pie, Cell, BarChart
+  ComposedChart, Bar, Area, PieChart, Pie, Cell, BarChart
 } from 'recharts';
 import {
   TrendingUp, CheckCircle2, Sparkles, Loader2, Target, Clock,
@@ -15,6 +15,12 @@ import StcGtcCard from './StcGtcCard';
 import DeltaBadge from './DeltaBadge';
 import SectionLabel from './SectionLabel';
 import YoySeasonalityCard from './YoySeasonalityCard';
+import PeriodSelector from './PeriodSelector';
+
+const COMPARISON_LABEL = {
+  previous: 'vs. período anterior',
+  yearOverYear: 'vs. ano passado'
+};
 
 // Cartão de indicador padronizado: mesmo ícone neutro, mesmo tamanho de
 // número e mesmo lugar para a variação — só o conteúdo muda. Isso evita que
@@ -50,15 +56,14 @@ const KpiTile = (props) => {
 const DashboardTab = ({
   selectionSummary, backlogAnalysis, slaAnalysis, chartData, visibleRangeData, dynamicAnalysis,
   aiAnalysis, isAnalyzing, aiError, analyzeWithAI, visibleRange, setVisibleRange,
-  selectedPiSegment, setSelectedPiSegment, data,
+  selectedDateRange, activePresetKey, applyPreset, applyCustomRange,
+  comparisonMode, setComparisonMode,
+  selectedPiSegment, setSelectedPiSegment, data, handleDownloadExcel,
   periodComparison, stcGtcAnalysis, health, alerts, onNavigate, goals, updateGoals,
   yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics
 }) => {
   const estimativaZerarFila = selectionSummary?.mediaSeparacoesPeriodo > 0 ? (backlogAnalysis?.totalPending / selectionSummary.mediaSeparacoesPeriodo).toFixed(1) : "indefinido";
-
-  // Calcula corretamente as datas para exibição baseada na nulidade do visibleRange
-  const startIdx = visibleRange ? visibleRange.startIndex : 0;
-  const endIdx = visibleRange ? visibleRange.endIndex : chartData.length - 1;
+  const comparisonLabel = COMPARISON_LABEL[comparisonMode] || 'vs. período anterior';
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
@@ -82,7 +87,7 @@ const DashboardTab = ({
           infoDescription="Total de pedidos que entraram no sistema WMS no período selecionado."
           value={selectionSummary?.entradas.toLocaleString()}
           context={`Média de ${selectionSummary?.mediaEntradasPeriodo} por dia`}
-          delta={<DeltaBadge value={periodComparison?.deltas.entradas ?? null} goodDirection="neutral" />}
+          delta={<DeltaBadge value={periodComparison?.deltas.entradas ?? null} goodDirection="neutral" label={comparisonLabel} />}
         />
         <KpiTile
           icon={CheckCircle2}
@@ -91,7 +96,7 @@ const DashboardTab = ({
           infoDescription="Total de pedidos que foram expedidos (concluídos) pelo WMS no período selecionado."
           value={selectionSummary?.separacoes.toLocaleString()}
           context={`Média de ${selectionSummary?.mediaSeparacoesPeriodo} por dia`}
-          delta={<DeltaBadge value={periodComparison?.deltas.separacoes ?? null} goodDirection="up" />}
+          delta={<DeltaBadge value={periodComparison?.deltas.separacoes ?? null} goodDirection="up" label={comparisonLabel} />}
         />
         <KpiTile
           icon={Target}
@@ -100,7 +105,7 @@ const DashboardTab = ({
           infoDescription="Percentual de pedidos expedidos em até 20 dias a partir da data de entrada. É a meta padrão de prazo da operação."
           value={`${slaAnalysis?.taxaNoPrazo}%`}
           context="Pedidos expedidos dentro do prazo"
-          delta={<DeltaBadge value={periodComparison?.deltas.slaRate ?? null} format="points" goodDirection="up" />}
+          delta={<DeltaBadge value={periodComparison?.deltas.slaRate ?? null} format="points" goodDirection="up" label={comparisonLabel} />}
         />
         <KpiTile
           icon={Clock}
@@ -110,7 +115,7 @@ const DashboardTab = ({
           value={selectionSummary?.avgLeadTimePeriodo}
           unit="dias"
           context="Somente pedidos já expedidos"
-          delta={<DeltaBadge value={periodComparison?.deltas.avgLeadTime ?? null} goodDirection="down" />}
+          delta={<DeltaBadge value={periodComparison?.deltas.avgLeadTime ?? null} goodDirection="down" label={comparisonLabel} />}
         />
         <KpiTile
           icon={Scale}
@@ -180,42 +185,19 @@ const DashboardTab = ({
         />
       </div>
 
-      <SectionLabel title="Tendências ao Longo do Tempo" description="Arraste as alças abaixo para mudar o período de todos os gráficos" />
+      <SectionLabel title="Tendências ao Longo do Tempo" description="Escolha um período pronto, um intervalo específico, ou ajuste manualmente pela barra" />
 
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Período de Análise</h3>
-             <InfoButton title="Período de Análise" description="Arraste as alças para filtrar o intervalo de tempo que deseja analisar nos gráficos e indicadores desta aba." />
-          </div>
-          <div className="text-sm font-semibold text-slate-600">
-            {chartData[startIdx]?.date && chartData[endIdx]?.date && (
-              <>{new Date(chartData[startIdx].date).toLocaleDateString('pt-BR')} — {new Date(chartData[endIdx].date).toLocaleDateString('pt-BR')}</>
-            )}
-          </div>
-        </div>
-        <div className="h-[60px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData}>
-              <XAxis dataKey="date" hide />
-              <Brush
-                dataKey="date"
-                height={35}
-                stroke="#cbd5e1"
-                fill="#f1f5f9"
-                travellerWidth={12}
-                startIndex={startIdx}
-                endIndex={endIdx}
-                onChange={(r) => {
-                  if (r && r.startIndex !== undefined && r.endIndex !== undefined) {
-                    setVisibleRange({startIndex: r.startIndex, endIndex: r.endIndex});
-                  }
-                }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <PeriodSelector
+        chartData={chartData}
+        visibleRange={visibleRange}
+        setVisibleRange={setVisibleRange}
+        selectedDateRange={selectedDateRange}
+        activePresetKey={activePresetKey}
+        applyPreset={applyPreset}
+        applyCustomRange={applyCustomRange}
+        comparisonMode={comparisonMode}
+        setComparisonMode={setComparisonMode}
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
@@ -273,7 +255,7 @@ const DashboardTab = ({
 
       <SectionLabel title="Qualidade do Processo" description="Tempo total de atendimento e saúde dos pedidos e documentos" />
 
-      <StcGtcCard stcGtcAnalysis={stcGtcAnalysis} />
+      <StcGtcCard stcGtcAnalysis={stcGtcAnalysis} handleDownloadExcel={handleDownloadExcel} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">

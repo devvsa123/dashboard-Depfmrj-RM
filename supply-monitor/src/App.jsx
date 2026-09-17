@@ -119,9 +119,16 @@ const App = () => {
               analyzeWithAI={ai.analyzeWithAI}
               visibleRange={dashboardAnalytics.visibleRange}
               setVisibleRange={dashboardAnalytics.setVisibleRange}
+              selectedDateRange={dashboardAnalytics.selectedDateRange}
+              activePresetKey={dashboardAnalytics.activePresetKey}
+              applyPreset={dashboardAnalytics.applyPreset}
+              applyCustomRange={dashboardAnalytics.applyCustomRange}
+              comparisonMode={dashboardAnalytics.comparisonMode}
+              setComparisonMode={dashboardAnalytics.setComparisonMode}
               selectedPiSegment={selectedPiSegment}
               setSelectedPiSegment={setSelectedPiSegment}
               data={data}
+              handleDownloadExcel={downloadExcel}
               periodComparison={dashboardAnalytics.periodComparison}
               stcGtcAnalysis={stcGtcAnalysis}
               health={riskAlerts.health}
