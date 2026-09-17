@@ -13,6 +13,7 @@ import RiskAlertsPanel from './RiskAlertsPanel';
 import GoalsPanel from './GoalsPanel';
 import StcGtcCard from './StcGtcCard';
 import RmTypeComparisonCard from './RmTypeComparisonCard';
+import OmsHandoffCard from './OmsHandoffCard';
 import DeltaBadge from './DeltaBadge';
 import SectionLabel from './SectionLabel';
 import YoySeasonalityCard from './YoySeasonalityCard';
@@ -60,7 +61,9 @@ const DashboardTab = ({
   selectedDateRange, activePresetKey, applyPreset, applyCustomRange,
   comparisonMode, setComparisonMode,
   selectedPiSegment, setSelectedPiSegment, data, handleDownloadExcel,
-  periodComparison, stcGtcAnalysis, rmTypeComparison, health, alerts, onNavigate, goals, updateGoals,
+  periodComparison, stcGtcAnalysis, rmTypeComparison, interfaceAnalysis,
+  interfaceStartDate, setInterfaceStartDate, interfaceEndDate, setInterfaceEndDate,
+  health, alerts, onNavigate, goals, updateGoals,
   yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics
 }) => {
   const estimativaZerarFila = selectionSummary?.mediaSeparacoesPeriodo > 0 ? (backlogAnalysis?.totalPending / selectionSummary.mediaSeparacoesPeriodo).toFixed(1) : "indefinido";
@@ -260,6 +263,14 @@ const DashboardTab = ({
       <SectionLabel title="Qualidade do Processo" description="Tempo total de atendimento e saúde dos pedidos e documentos" />
 
       <StcGtcCard stcGtcAnalysis={stcGtcAnalysis} handleDownloadExcel={handleDownloadExcel} />
+
+      <OmsHandoffCard
+        interfaceAnalysis={interfaceAnalysis}
+        interfaceStartDate={interfaceStartDate}
+        setInterfaceStartDate={setInterfaceStartDate}
+        interfaceEndDate={interfaceEndDate}
+        setInterfaceEndDate={setInterfaceEndDate}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">

@@ -1,10 +1,58 @@
 import { useMemo, useState } from 'react';
 import { safeGetISODate } from '../utils/dates';
+import { classifyStc } from './useStcGtcAnalysis';
+
+// Resume uma lista de pedidos sob a ótica de pedidos E de documentos
+// (quantos STC/GTC distintos ela cobre) — a mesma distinção usada no
+// cartão de STC/GTC: um documento agrupa vários pedidos.
+const summarizeByDocument = (items) => {
+  const stcSet = new Set();
+  const gtcSet = new Set();
+  const today = new Date();
+  let totalAge = 0, countAge = 0, oldestDaysOpen = 0;
+
+  items.forEach(item => {
+    const type = classifyStc(item.STC);
+    if (type) {
+      const key = String(item.STC).trim().toUpperCase();
+      (type === 'STC' ? stcSet : gtcSet).add(key);
+    }
+    const entryStr = safeGetISODate(item.DATA_ENTRADA);
+    if (entryStr) {
+      const days = Math.floor((today - new Date(entryStr)) / (1000 * 60 * 60 * 24));
+      totalAge += days;
+      countAge++;
+      if (days > oldestDaysOpen) oldestDaysOpen = days;
+    }
+  });
+
+  return {
+    pedidoCount: items.length,
+    stcCount: stcSet.size,
+    gtcCount: gtcSet.size,
+    avgDaysOpen: countAge ? parseFloat((totalAge / countAge).toFixed(1)) : 0,
+    oldestDaysOpen
+  };
+};
+
+// Agrupa uma lista de pedidos por mês de entrada, para uma visão de
+// tendência mensal (ex: quantos pedidos foram arrecadados pela OMS a cada mês).
+const monthlyCountOf = (items) => {
+  const months = {};
+  items.forEach(item => {
+    const entryStr = safeGetISODate(item.DATA_ENTRADA);
+    if (!entryStr) return;
+    const key = entryStr.substring(0, 7);
+    months[key] = (months[key] || 0) + 1;
+  });
+  return Object.entries(months)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, count]) => ({ month, count }));
+};
 
 // Cruza os status lógicos entre WMS e SINGRA para achar descasamentos,
 // pedidos aguardando retirada/arrecadação e falhas de interface.
 export const useInterfaceAnalysis = (data, singraData) => {
-  const [activeInterfaceView, setActiveInterfaceView] = useState("falhasInterface");
   const [selectedErrorFilter, setSelectedErrorFilter] = useState(null);
 
   const [interfaceStartDate, setInterfaceStartDate] = useState(() => {
@@ -130,12 +178,16 @@ export const useInterfaceAnalysis = (data, singraData) => {
       }
     });
 
-    return results;
+    return {
+      ...results,
+      aguardandoRetiradaSummary: summarizeByDocument(results.aguardandoRetirada),
+      aguardandoArrecadacaoSummary: summarizeByDocument(results.aguardandoArrecadacao),
+      arrecadadoOmsSummary: { ...summarizeByDocument(results.arrecadadoOms), monthly: monthlyCountOf(results.arrecadadoOms) }
+    };
   }, [data, singraData, interfaceStartDate, interfaceEndDate]);
 
   return {
     interfaceAnalysis,
-    activeInterfaceView, setActiveInterfaceView,
     selectedErrorFilter, setSelectedErrorFilter,
     interfaceStartDate, setInterfaceStartDate,
     interfaceEndDate, setInterfaceEndDate

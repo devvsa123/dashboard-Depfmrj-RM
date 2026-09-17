@@ -135,6 +135,11 @@ const App = () => {
               periodComparison={dashboardAnalytics.periodComparison}
               stcGtcAnalysis={stcGtcAnalysis}
               rmTypeComparison={rmTypeComparison}
+              interfaceAnalysis={interfaceAnalysis.interfaceAnalysis}
+              interfaceStartDate={interfaceAnalysis.interfaceStartDate}
+              setInterfaceStartDate={interfaceAnalysis.setInterfaceStartDate}
+              interfaceEndDate={interfaceAnalysis.interfaceEndDate}
+              setInterfaceEndDate={interfaceAnalysis.setInterfaceEndDate}
               health={riskAlerts.health}
               alerts={riskAlerts.alerts}
               onNavigate={setActiveTab}
@@ -164,14 +169,8 @@ const App = () => {
           ) : activeTab === 'interface' ? (
             <InterfaceTab
               interfaceAnalysis={interfaceAnalysis.interfaceAnalysis}
-              activeInterfaceView={interfaceAnalysis.activeInterfaceView}
-              setActiveInterfaceView={interfaceAnalysis.setActiveInterfaceView}
               selectedErrorFilter={interfaceAnalysis.selectedErrorFilter}
               setSelectedErrorFilter={interfaceAnalysis.setSelectedErrorFilter}
-              interfaceStartDate={interfaceAnalysis.interfaceStartDate}
-              setInterfaceStartDate={interfaceAnalysis.setInterfaceStartDate}
-              interfaceEndDate={interfaceAnalysis.interfaceEndDate}
-              setInterfaceEndDate={interfaceAnalysis.setInterfaceEndDate}
               handleDownloadExcel={downloadExcel}
             />
           ) : activeTab === 'email' ? (

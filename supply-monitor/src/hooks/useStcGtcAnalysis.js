@@ -3,7 +3,7 @@ import { safeGetISODate } from '../utils/dates';
 
 // Classifica um valor da coluna STC em 'GTC' (ex: "GTC 002/2026") ou 'STC'
 // (ex: "003/2026" — sem o prefixo). Ambos convivem na mesma coluna.
-const classifyStc = (rawValue) => {
+export const classifyStc = (rawValue) => {
   const value = String(rawValue || "").trim();
   if (!value || value === "-") return null;
   return value.toUpperCase().startsWith("GTC") ? "GTC" : "STC";
