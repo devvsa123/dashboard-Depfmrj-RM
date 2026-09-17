@@ -1,0 +1,6 @@
+{
+  "installCommand": "cd supply-monitor && npm install",
+  "buildCommand": "cd supply-monitor && npm run build",
+  "outputDirectory": "supply-monitor/dist",
+  "framework": "vite"
+}
