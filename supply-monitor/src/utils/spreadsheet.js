@@ -1,4 +1,5 @@
 import { SINGRA_URL } from '../constants';
+import { safeGetISODate } from './dates';
 
 // Normaliza as chaves de um objeto vindo de planilha: remove aspas, acentos e
 // padroniza para maiúsculas, já que WMS e SINGRA usam cabeçalhos inconsistentes.
@@ -40,4 +41,25 @@ export const fetchSingraOnly = async () => {
     console.error("Erro ao puxar Singra avulso", err);
     return [];
   }
+};
+
+export const downloadExcel = (dataSet, sheetName) => {
+  if (!dataSet || dataSet.length === 0) return;
+  const exportData = dataSet.map(item => ({
+    CAM: item.cam || item.CAM || "-",
+    PEDIDO: item.idOriginal || item.PEDIDO || item.RM || "S/N",
+    CAPA: item.capa || item.CAPA || "-", // NOVA COLUNA CAPA
+    STC: item.stc || item.STC || "-",
+    STATUS_WMS: item.wmsStatus || item.STATUS || "-",
+    STATUS_SINGRA: item.singraStatus || "-",
+    DATA_ENTRADA: item.dataEntrada || item.entryDateIso || (item.DATA_ENTRADA ? safeGetISODate(item.DATA_ENTRADA) : "-"),
+    DATA_EXPEDICAO: item.dataSeparacao || (item.DATA_SEPARACAO ? safeGetISODate(item.DATA_SEPARACAO) : "-"),
+    LOTE: item.lote || item.LOTE || "-", // NOVA COLUNA LOTE
+    ...(item.daysOpen !== undefined ? { DIAS_EM_ABERTO: item.daysOpen } : {})
+  }));
+
+  const ws = window.XLSX.utils.json_to_sheet(exportData);
+  const wb = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb, ws, "Dados");
+  window.XLSX.writeFile(wb, `${sheetName}_${new Date().toISOString().split('T')[0]}.xlsx`);
 };

@@ -4,14 +4,14 @@ import {
 } from 'recharts';
 import {
   TrendingUp, CheckCircle2, Sparkles, Loader2, Target, Clock,
-  XCircle, Package, RefreshCw
+  XCircle, Package, RefreshCw, AlertCircle
 } from 'lucide-react';
 import InfoButton from './InfoButton';
 import PiDetailsModal from './PiDetailsModal';
 
 const DashboardTab = ({
   selectionSummary, backlogAnalysis, slaAnalysis, chartData, visibleRangeData, dynamicAnalysis,
-  aiAnalysis, isAnalyzing, analyzeWithAI, visibleRange, setVisibleRange,
+  aiAnalysis, isAnalyzing, aiError, analyzeWithAI, visibleRange, setVisibleRange,
   selectedPiSegment, setSelectedPiSegment, data
 }) => {
   const estimativaZerarFila = selectionSummary?.mediaSeparacoesPeriodo > 0 ? (backlogAnalysis?.totalPending / selectionSummary.mediaSeparacoesPeriodo).toFixed(1) : "N/A";
@@ -87,6 +87,12 @@ const DashboardTab = ({
           </div>
         </button>
       </div>
+
+      {aiError && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-700 text-sm font-medium mt-4">
+          <AlertCircle size={18} className="shrink-0" /> {aiError}
+        </div>
+      )}
 
       {aiAnalysis && (
         <div className="p-1 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-[34px] shadow-xl mt-4">
