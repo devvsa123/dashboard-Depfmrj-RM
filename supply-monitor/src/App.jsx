@@ -11,10 +11,14 @@ import { useYoyAnalysis } from './hooks/useYoyAnalysis';
 import { useBacklogAnalysis } from './hooks/useBacklogAnalysis';
 import { useInterfaceAnalysis } from './hooks/useInterfaceAnalysis';
 import { useAiConsultant } from './hooks/useAiConsultant';
+import { useGoals } from './hooks/useGoals';
+import { useRiskAlerts } from './hooks/useRiskAlerts';
+import { useStcGtcAnalysis } from './hooks/useStcGtcAnalysis';
 import DashboardTab from './components/DashboardTab';
 import BacklogTab from './components/BacklogTab';
 import InterfaceTab from './components/InterfaceTab';
 import EmailSearchTab from './components/EmailSearchTab';
+import HealthBadge from './components/HealthBadge';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -36,6 +40,15 @@ const App = () => {
     backlogAnalysis: backlogAnalysis.backlogAnalysis,
     interfaceAnalysis: interfaceAnalysis.interfaceAnalysis
   });
+  const { goals, updateGoals } = useGoals();
+  const riskAlerts = useRiskAlerts({
+    backlogAnalysis: backlogAnalysis.backlogAnalysis,
+    interfaceAnalysis: interfaceAnalysis.interfaceAnalysis,
+    slaAnalysis: dashboardAnalytics.slaAnalysis,
+    selectionSummary: dashboardAnalytics.selectionSummary,
+    goals
+  });
+  const stcGtcAnalysis = useStcGtcAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
 
   const handleFileUpload = (e) => {
     ai.resetAiAnalysis();
@@ -64,11 +77,14 @@ const App = () => {
                   <input type="file" className="hidden" onChange={handleFileUpload} />
                 </label>
               </div>
-              {lastSync && (
-                <div className="text-[11px] text-slate-500 font-bold flex items-center gap-1.5 bg-slate-200/50 px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                  <Clock size={12} className="text-indigo-500" /> Última atualização: <span className="text-slate-700">{lastSync}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {data.length > 0 && <HealthBadge health={riskAlerts.health} />}
+                {lastSync && (
+                  <div className="text-[11px] text-slate-500 font-bold flex items-center gap-1.5 bg-slate-200/50 px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+                    <Clock size={12} className="text-indigo-500" /> Última atualização: <span className="text-slate-700">{lastSync}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -106,6 +122,13 @@ const App = () => {
               selectedPiSegment={selectedPiSegment}
               setSelectedPiSegment={setSelectedPiSegment}
               data={data}
+              periodComparison={dashboardAnalytics.periodComparison}
+              stcGtcAnalysis={stcGtcAnalysis}
+              health={riskAlerts.health}
+              alerts={riskAlerts.alerts}
+              onNavigate={setActiveTab}
+              goals={goals}
+              updateGoals={updateGoals}
             />
           ) : activeTab === 'backlog' ? (
             <BacklogTab

@@ -8,11 +8,17 @@ import {
 } from 'lucide-react';
 import InfoButton from './InfoButton';
 import PiDetailsModal from './PiDetailsModal';
+import HealthBanner from './HealthBanner';
+import RiskAlertsPanel from './RiskAlertsPanel';
+import GoalsPanel from './GoalsPanel';
+import StcGtcCard from './StcGtcCard';
+import DeltaBadge from './DeltaBadge';
 
 const DashboardTab = ({
   selectionSummary, backlogAnalysis, slaAnalysis, chartData, visibleRangeData, dynamicAnalysis,
   aiAnalysis, isAnalyzing, aiError, analyzeWithAI, visibleRange, setVisibleRange,
-  selectedPiSegment, setSelectedPiSegment, data
+  selectedPiSegment, setSelectedPiSegment, data,
+  periodComparison, stcGtcAnalysis, health, alerts, onNavigate, goals, updateGoals
 }) => {
   const estimativaZerarFila = selectionSummary?.mediaSeparacoesPeriodo > 0 ? (backlogAnalysis?.totalPending / selectionSummary.mediaSeparacoesPeriodo).toFixed(1) : "N/A";
 
@@ -29,6 +35,9 @@ const DashboardTab = ({
         visibleRange={visibleRange}
         data={data}
       />
+
+      <HealthBanner health={health} alerts={alerts} />
+
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-1">
@@ -36,7 +45,8 @@ const DashboardTab = ({
              <InfoButton title="Entradas (Corte)" description="Total de pedidos que entraram no sistema WMS no período selecionado." />
           </div>
           <p className="text-2xl font-black text-slate-800">{selectionSummary?.entradas.toLocaleString()}</p>
-          <div className="mt-1 text-[10px] text-indigo-600 font-bold flex items-center gap-1"><TrendingUp size={12} /> {selectionSummary?.mediaEntradasPeriodo}/dia</div>
+          <div className="mt-1 text-[10px] text-indigo-600 font-bold flex items-center gap-1 mb-1"><TrendingUp size={12} /> {selectionSummary?.mediaEntradasPeriodo}/dia</div>
+          <DeltaBadge value={periodComparison?.deltas.entradas ?? null} goodDirection="neutral" />
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-1">
@@ -44,7 +54,8 @@ const DashboardTab = ({
              <InfoButton title="Saídas (Corte)" description="Total de pedidos que foram expedidos/concluídos pelo WMS no período filtrado." />
           </div>
           <p className="text-2xl font-black text-slate-800">{selectionSummary?.separacoes.toLocaleString()}</p>
-          <div className="mt-1 text-[10px] text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 size={12} /> {selectionSummary?.mediaSeparacoesPeriodo}/dia</div>
+          <div className="mt-1 text-[10px] text-emerald-600 font-bold flex items-center gap-1 mb-1"><CheckCircle2 size={12} /> {selectionSummary?.mediaSeparacoesPeriodo}/dia</div>
+          <DeltaBadge value={periodComparison?.deltas.separacoes ?? null} goodDirection="up" />
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-1">
@@ -52,7 +63,8 @@ const DashboardTab = ({
              <InfoButton title="SLA (Nível de Serviço)" description="Percentual de pedidos expedidos em até 20 dias a partir da data de entrada. Meta padrão da operação." />
           </div>
           <p className="text-2xl font-black text-slate-800">{slaAnalysis?.taxaNoPrazo}%</p>
-          <div className="mt-1 text-[10px] text-blue-600 font-bold flex items-center gap-1"><Target size={12} /> No prazo definido</div>
+          <div className="mt-1 text-[10px] text-blue-600 font-bold flex items-center gap-1 mb-1"><Target size={12} /> No prazo definido</div>
+          <DeltaBadge value={periodComparison?.deltas.slaRate ?? null} format="points" goodDirection="up" />
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-1">
@@ -60,7 +72,8 @@ const DashboardTab = ({
              <InfoButton title="Lead Time Médio" description="Tempo médio (em dias) que os pedidos levaram desde a entrada até a expedição final no período." />
           </div>
           <p className="text-2xl font-black text-slate-800">{selectionSummary?.avgLeadTimePeriodo} <span className="text-xs text-slate-400 font-bold">dias</span></p>
-          <div className="mt-1 text-[10px] text-purple-600 font-bold flex items-center gap-1"><Clock size={12} /> (Expedidos)</div>
+          <div className="mt-1 text-[10px] text-purple-600 font-bold flex items-center gap-1 mb-1"><Clock size={12} /> (Expedidos)</div>
+          <DeltaBadge value={periodComparison?.deltas.avgLeadTime ?? null} goodDirection="down" />
         </div>
         <div className={`p-6 rounded-3xl shadow-sm border-2 transition-all ${selectionSummary?.balanco >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-orange-50 border-orange-100'}`}>
            <div className="flex items-center justify-between mb-1">
@@ -102,6 +115,17 @@ const DashboardTab = ({
           </div>
         </div>
       )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RiskAlertsPanel alerts={alerts} onNavigate={onNavigate} />
+        <GoalsPanel
+          goals={goals}
+          updateGoals={updateGoals}
+          slaAtual={Number(slaAnalysis?.taxaNoPrazo) || 0}
+          avgAge={Number(backlogAnalysis?.avgAge) || 0}
+          oldest={backlogAnalysis?.oldestOrder?.daysOpen || 0}
+        />
+      </div>
 
       <div className="bg-white p-6 rounded-[30px] shadow-sm border border-slate-200 mb-6 mt-4">
         <div className="flex items-center justify-between mb-4">
@@ -183,6 +207,8 @@ const DashboardTab = ({
           </div>
         </div>
       </div>
+
+      <StcGtcCard stcGtcAnalysis={stcGtcAnalysis} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-200">

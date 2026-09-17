@@ -155,8 +155,69 @@ export const useDashboardAnalytics = (data) => {
     };
   }, [data, chartData, visibleRange]);
 
+  // Compara o período selecionado com o período imediatamente anterior de
+  // mesma duração (ex: últimos 30 dias vs os 30 dias antes deles), para dar
+  // contexto de tendência aos KPIs (subiu/caiu e quanto).
+  const periodComparison = useMemo(() => {
+    if (chartData.length === 0) return null;
+    const startIndex = visibleRange ? visibleRange.startIndex : 0;
+    const endIndex = visibleRange ? visibleRange.endIndex : chartData.length - 1;
+    const windowSize = endIndex - startIndex + 1;
+
+    const prevEndIndex = startIndex - 1;
+    const prevStartIndex = prevEndIndex - windowSize + 1;
+    if (prevStartIndex < 0) return null; // não há histórico suficiente antes do período atual
+
+    const summarize = (fromIdx, toIdx) => {
+      const slice = chartData.slice(fromIdx, toIdx + 1);
+      const entradas = slice.reduce((acc, curr) => acc + (curr.entradas || 0), 0);
+      const separacoes = slice.reduce((acc, curr) => acc + (curr.separacoes || 0), 0);
+      const validDays = slice.filter(d => d.leadTimeDaily > 0);
+      const avgLeadTime = validDays.length ? validDays.reduce((acc, c) => acc + c.leadTimeDaily, 0) / validDays.length : 0;
+
+      const startDate = new Date(chartData[fromIdx]?.date);
+      const endDate = new Date(chartData[toIdx]?.date);
+      let expedidosTotal = 0, expedidosNoPrazo = 0;
+      const metaSlaDias = 20;
+      data.forEach(item => {
+        const sepDateStr = safeGetISODate(item.DATA_SEPARACAO);
+        const entryDateStr = safeGetISODate(item.DATA_ENTRADA);
+        const status = String(item.STATUS || "").toUpperCase().trim();
+        if (status === "EXPEDIDO" && sepDateStr && entryDateStr) {
+          const sepDate = new Date(sepDateStr);
+          if (sepDate >= startDate && sepDate <= endDate) {
+            expedidosTotal++;
+            const diffDays = Math.ceil((sepDate - new Date(entryDateStr)) / (1000 * 60 * 60 * 24));
+            if (diffDays <= metaSlaDias) expedidosNoPrazo++;
+          }
+        }
+      });
+      const slaRate = expedidosTotal > 0 ? (expedidosNoPrazo / expedidosTotal) * 100 : 0;
+
+      return { entradas, separacoes, balanco: separacoes - entradas, avgLeadTime, slaRate };
+    };
+
+    const current = summarize(startIndex, endIndex);
+    const previous = summarize(prevStartIndex, prevEndIndex);
+
+    const pctChange = (curr, prev) => {
+      if (prev === 0) return curr === 0 ? 0 : null; // sem base de comparação (divisão por zero)
+      return ((curr - prev) / Math.abs(prev)) * 100;
+    };
+
+    return {
+      current, previous,
+      deltas: {
+        entradas: pctChange(current.entradas, previous.entradas),
+        separacoes: pctChange(current.separacoes, previous.separacoes),
+        avgLeadTime: pctChange(current.avgLeadTime, previous.avgLeadTime),
+        slaRate: current.slaRate - previous.slaRate // diferença em pontos percentuais, não %
+      }
+    };
+  }, [data, chartData, visibleRange]);
+
   return {
     chartData, visibleRange, setVisibleRange, visibleRangeData,
-    selectionSummary, slaAnalysis, dynamicAnalysis
+    selectionSummary, slaAnalysis, dynamicAnalysis, periodComparison
   };
 };
