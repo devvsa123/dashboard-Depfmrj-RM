@@ -7,105 +7,14 @@ import {
   Upload, FileSpreadsheet, TrendingUp, CheckCircle2, Sparkles,
   Loader2, Activity, Target, Clock, AlertCircle, XCircle, Package,
   LayoutDashboard, Hourglass, AlertTriangle, ListFilter, X, Download, RefreshCw,
-  Network, Database, ArrowRightLeft, Calendar, Info, Search, Save, Bookmark, Trash2
+  Network, Database, ArrowRightLeft, Calendar, Search, Save, Bookmark, Trash2
 } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-const WMS_URL = "https://spxj2yln4kauap03.public.blob.vercel-storage.com/planilha_estoque.xls";
-const SINGRA_URL = "https://spxj2yln4kauap03.public.blob.vercel-storage.com/planilha_rms_unificada.csv";
-
-// --- MAPEAMENTO PADRÃO DE CORES POR STATUS ---
-const STATUS_COLOR_MAP = {
-  'CONFERIDO': '#10b981',       // Esmeralda (Sucesso/Final de fluxo)
-  'CONFERENCIA': '#8b5cf6',     // Violeta
-  'EM CONFERENCIA': '#8b5cf6',  // Violeta
-  'SEPARACAO': '#f59e0b',       // Âmbar
-  'EM SEPARACAO': '#f59e0b',    // Âmbar
-  'SEPARADO': '#f59e0b',        // Âmbar
-  'PLANEJAMENTO': '#3b82f6',    // Azul
-  'EM PLANEJAMENTO': '#3b82f6', // Azul
-  'RESERVADO': '#6366f1',       // Índigo
-  'EM ATENDIMENTO': '#06b6d4',  // Ciano
-  'PENDENTE': '#94a3b8',        // Slate (Neutro)
-  'N/A': '#cbd5e1'              // Cinza claro
-};
-
-const getStatusColor = (status) => {
-  const normalized = String(status || "").toUpperCase().trim();
-  return STATUS_COLOR_MAP[normalized] || '#94a3b8'; 
-};
-
-// --- UTILITÁRIOS DE CACHE (IndexedDB) ---
-const initDB = () => {
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open('SupplyMonitorDB', 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('cacheStore')) {
-        db.createObjectStore('cacheStore');
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-const saveToCache = async (key, data) => {
-  try {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('cacheStore', 'readwrite');
-      const store = tx.objectStore('cacheStore');
-      store.put(data, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch (err) {
-    console.warn("Falha ao salvar no cache local:", err);
-  }
-};
-
-const getFromCache = async (key) => {
-  try {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction('cacheStore', 'readonly');
-      const store = tx.objectStore('cacheStore');
-      const request = store.get(key);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  } catch (err) {
-    console.warn("Falha ao ler cache local:", err);
-    return null;
-  }
-};
-
-// --- COMPONENTE DE EXPLICAÇÃO (TOOLTIP) ---
-const InfoButton = ({ title, description }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <div className="relative inline-block ml-1">
-      <button 
-        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-        className="p-1 hover:bg-slate-100 rounded-full transition-colors text-slate-300 hover:text-indigo-500"
-      >
-        <Info size={14} />
-      </button>
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setIsOpen(false)} />
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-4 bg-slate-800 text-white text-xs rounded-2xl shadow-2xl z-[70] animate-in fade-in zoom-in duration-200">
-            <p className="font-black uppercase tracking-widest mb-2 text-indigo-300 border-b border-slate-700 pb-1">{title}</p>
-            <p className="font-medium leading-relaxed">{description}</p>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-800" />
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+import { XLSX_SCRIPT_URL, WMS_URL, SINGRA_URL, getStatusColor } from './constants';
+import { saveToCache, getFromCache } from './utils/cache';
+import { safeGetISODate } from './utils/dates';
+import { normalizeKeys, fetchSingraOnly } from './utils/spreadsheet';
+import InfoButton from './components/InfoButton';
 
 const App = () => {
   const [data, setData] = useState([]);
@@ -196,8 +105,6 @@ const App = () => {
 
   
 
-  const apiKey = "AIzaSyBxUWKDnpog0loQyd3tiFUguEgxwr9xh4k"; 
-
   useEffect(() => {
     if (window.XLSX) {
       setLibLoaded(true);
@@ -259,62 +166,6 @@ const App = () => {
   setExtractedOrders(results);
 }, [emailText, data, singraData]);
 
-  const safeGetISODate = (val) => {
-    if (!val) return null;
-    if (val instanceof Date) return val.toISOString().split('T')[0];
-    if (typeof val === 'number') {
-      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
-      return date.toISOString().split('T')[0];
-    }
-    if (typeof val === 'string') {
-      const trimmed = val.trim();
-      const brMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if (brMatch) {
-        return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
-      }
-    }
-    const d = new Date(val);
-    return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
-  };
-
-  const fetchSingraOnly = async () => {
-    try {
-      const res = await fetch(`${SINGRA_URL}?t=${Date.now()}`);
-      if (!res.ok) return [];
-      const text = await res.text();
-      let json = [];
-      
-      if (text.includes(';') && !text.startsWith('PK')) {
-        const lines = text.split('\n');
-        const headers = lines[0].split(';').map(h => h.replace(/['"]/g, '').trim());
-        json = lines.slice(1).filter(l => l.trim()).map(line => {
-             const values = line.split(';').map(v => v.replace(/['"]/g, '').trim());
-             const obj = {};
-             headers.forEach((h, i) => obj[h] = values[i]);
-             return obj;
-        });
-      } else {
-        const arrayBuffer = new TextEncoder().encode(text);
-        const wb = window.XLSX.read(arrayBuffer, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        json = window.XLSX.utils.sheet_to_json(ws);
-      }
-
-      return json.map(item => {
-        const newItem = {};
-        Object.keys(item).forEach(key => {
-          const cleanKeyRaw = key.replace(/['"]/g, '');
-          const normalizedKey = cleanKeyRaw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-          newItem[normalizedKey] = item[key];
-        });
-        return newItem;
-      });
-    } catch (err) {
-      console.error("Erro ao puxar Singra avulso", err);
-      return [];
-    }
-  };
-
   const performSync = async (forceDownload = false) => {
     if (!libLoaded) return;
     setLoading(true);
@@ -347,15 +198,7 @@ const App = () => {
       
       if (wmsJson.length === 0) throw new Error("A planilha da nuvem está vazia.");
 
-      const normalizedWms = wmsJson.map(item => {
-        const newItem = {};
-        Object.keys(item).forEach(key => {
-          const cleanKeyRaw = key.replace(/['"]/g, '');
-          const normalizedKey = cleanKeyRaw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-          newItem[normalizedKey] = item[key];
-        });
-        return newItem;
-      });
+      const normalizedWms = wmsJson.map(normalizeKeys);
 
       const normalizedSingra = await fetchSingraOnly();
       
@@ -414,15 +257,7 @@ const App = () => {
 
         if (jsonData.length === 0) throw new Error("A planilha está vazia.");
 
-        const normalizedData = jsonData.map(item => {
-          const newItem = {};
-          Object.keys(item).forEach(key => {
-            const cleanKeyRaw = key.replace(/['"]/g, '');
-            const normalizedKey = cleanKeyRaw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-            newItem[normalizedKey] = item[key];
-          });
-          return newItem;
-        });
+        const normalizedData = jsonData.map(normalizeKeys);
         setData(normalizedData);
       } catch (err) {
         setError("Erro ao processar o arquivo.");
@@ -892,6 +727,9 @@ const App = () => {
     setAiError("");
     setAiAnalysis("");
     try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("Chave da API Gemini não configurada (VITE_GEMINI_API_KEY).");
+
       const totalEntradasHist = chartData.reduce((acc, curr) => acc + (curr.entradas || 0), 0);
       const totalSaidasHist = chartData.reduce((acc, curr) => acc + (curr.separacoes || 0), 0);
       const mediaHistoricaSaidas = chartData.length > 0 ? (totalSaidasHist / chartData.length).toFixed(2) : 0;
