@@ -75,14 +75,21 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
         else if (expedidos.length > 0) partialDocuments++;
         else pendingDocuments++;
 
+        // Idade do DOCUMENTO = idade do seu pedido pendente mais antigo (o
+        // item que está de fato travando o documento). O balde de
+        // envelhecimento soma 1 por documento aqui, não 1 por pedido —
+        // senão um único STC parcial com vários pedidos pendentes inflaria
+        // a contagem várias vezes.
+        let oldestDaysOpenDoDocumento = 0;
         pendentes.forEach(p => {
           const entryDateIso = safeGetISODate(p.DATA_ENTRADA);
           const daysOpen = entryDateIso ? Math.floor((today - new Date(entryDateIso)) / (1000 * 60 * 60 * 24)) : 0;
           const enriched = { ...p, tipoDocumento: type, stcKey, daysOpen, entryDateIso };
           pedidosPendentes.push(enriched);
-          const bucket = agingBuckets.find(b => daysOpen >= b.min && daysOpen <= b.max);
-          if (bucket) bucket.count++;
+          if (daysOpen > oldestDaysOpenDoDocumento) oldestDaysOpenDoDocumento = daysOpen;
         });
+        const bucket = agingBuckets.find(b => oldestDaysOpenDoDocumento >= b.min && oldestDaysOpenDoDocumento <= b.max);
+        if (bucket) bucket.count++;
       });
 
       pendingOrders.push(...pedidosPendentes);

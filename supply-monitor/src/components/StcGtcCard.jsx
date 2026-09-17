@@ -158,8 +158,8 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <FileWarning size={14} className="text-slate-400" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Envelhecimento dos Pedidos Pendentes</p>
-                <InfoButton title="Envelhecimento" description="Distribui os pedidos ainda em aberto (dentro de documentos STC/GTC parciais ou pendentes) por tempo desde a entrada, separado por tipo de documento." />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Envelhecimento dos Documentos Pendentes</p>
+                <InfoButton title="Envelhecimento" description="Distribui os documentos STC/GTC ainda em aberto (parciais ou pendentes) por tempo desde a entrada do seu pedido mais antigo não expedido — o item que está de fato travando o documento. Cada documento conta uma única vez, mesmo que tenha vários pedidos pendentes." />
               </div>
               <div className="h-[220px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
