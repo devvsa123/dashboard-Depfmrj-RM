@@ -14,6 +14,7 @@ import { useAiConsultant } from './hooks/useAiConsultant';
 import { useGoals } from './hooks/useGoals';
 import { useRiskAlerts } from './hooks/useRiskAlerts';
 import { useStcGtcAnalysis } from './hooks/useStcGtcAnalysis';
+import { useRmTypeComparison } from './hooks/useRmTypeComparison';
 import DashboardTab from './components/DashboardTab';
 import BacklogTab from './components/BacklogTab';
 import InterfaceTab from './components/InterfaceTab';
@@ -41,14 +42,16 @@ const App = () => {
     interfaceAnalysis: interfaceAnalysis.interfaceAnalysis
   });
   const { goals, updateGoals } = useGoals();
+  const stcGtcAnalysis = useStcGtcAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
+  const rmTypeComparison = useRmTypeComparison(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const riskAlerts = useRiskAlerts({
     backlogAnalysis: backlogAnalysis.backlogAnalysis,
     interfaceAnalysis: interfaceAnalysis.interfaceAnalysis,
     slaAnalysis: dashboardAnalytics.slaAnalysis,
     selectionSummary: dashboardAnalytics.selectionSummary,
+    stcGtcAnalysis,
     goals
   });
-  const stcGtcAnalysis = useStcGtcAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
 
   const handleFileUpload = (e) => {
     ai.resetAiAnalysis();
@@ -131,6 +134,7 @@ const App = () => {
               handleDownloadExcel={downloadExcel}
               periodComparison={dashboardAnalytics.periodComparison}
               stcGtcAnalysis={stcGtcAnalysis}
+              rmTypeComparison={rmTypeComparison}
               health={riskAlerts.health}
               alerts={riskAlerts.alerts}
               onNavigate={setActiveTab}

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 // dos mesmos números já exibidos no dashboard, comparados às metas do
 // usuário (useGoals). Nenhum limiar extra escondido: os limiares "críticos"
 // são sempre um múltiplo claro da própria meta.
-export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, slaAnalysis, selectionSummary, goals }) => {
+export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, slaAnalysis, selectionSummary, stcGtcAnalysis, goals }) => {
   return useMemo(() => {
     const alerts = [];
 
@@ -93,6 +93,30 @@ export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, slaAnalysis,
       });
     }
 
+    // Taxa de conclusão de documentos STC/GTC: quantos dos documentos (não
+    // dos pedidos) já foram 100% expedidos, comparado à meta do usuário.
+    stcGtcAnalysis?.documents?.forEach(doc => {
+      if (doc.completionRate == null) return;
+      const label = doc.type === 'STC' ? 'STC' : 'GTC';
+      if (doc.completionRate < goals.docCompletionTarget - 20) {
+        alerts.push({
+          id: `doc-completion-critical-${doc.type}`,
+          severity: 'critical',
+          tab: 'dashboard',
+          title: `Conclusão de ${label} muito abaixo da meta`,
+          description: `Apenas ${doc.completionRate}% dos documentos ${label} estão totalmente concluídos, contra meta de ${goals.docCompletionTarget}%.`
+        });
+      } else if (doc.completionRate < goals.docCompletionTarget) {
+        alerts.push({
+          id: `doc-completion-warning-${doc.type}`,
+          severity: 'warning',
+          tab: 'dashboard',
+          title: `Conclusão de ${label} abaixo da meta`,
+          description: `${doc.completionRate}% dos documentos ${label} estão totalmente concluídos, contra meta de ${goals.docCompletionTarget}%.`
+        });
+      }
+    });
+
     const severityRank = { critical: 2, warning: 1 };
     alerts.sort((a, b) => severityRank[b.severity] - severityRank[a.severity]);
 
@@ -103,5 +127,5 @@ export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, slaAnalysis,
         : 'good';
 
     return { alerts, health };
-  }, [backlogAnalysis, interfaceAnalysis, slaAnalysis, selectionSummary, goals]);
+  }, [backlogAnalysis, interfaceAnalysis, slaAnalysis, selectionSummary, stcGtcAnalysis, goals]);
 };

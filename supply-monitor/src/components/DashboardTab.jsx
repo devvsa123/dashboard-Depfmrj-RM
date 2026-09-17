@@ -12,6 +12,7 @@ import HealthBanner from './HealthBanner';
 import RiskAlertsPanel from './RiskAlertsPanel';
 import GoalsPanel from './GoalsPanel';
 import StcGtcCard from './StcGtcCard';
+import RmTypeComparisonCard from './RmTypeComparisonCard';
 import DeltaBadge from './DeltaBadge';
 import SectionLabel from './SectionLabel';
 import YoySeasonalityCard from './YoySeasonalityCard';
@@ -59,7 +60,7 @@ const DashboardTab = ({
   selectedDateRange, activePresetKey, applyPreset, applyCustomRange,
   comparisonMode, setComparisonMode,
   selectedPiSegment, setSelectedPiSegment, data, handleDownloadExcel,
-  periodComparison, stcGtcAnalysis, health, alerts, onNavigate, goals, updateGoals,
+  periodComparison, stcGtcAnalysis, rmTypeComparison, health, alerts, onNavigate, goals, updateGoals,
   yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics
 }) => {
   const estimativaZerarFila = selectionSummary?.mediaSeparacoesPeriodo > 0 ? (backlogAnalysis?.totalPending / selectionSummary.mediaSeparacoesPeriodo).toFixed(1) : "indefinido";
@@ -182,8 +183,11 @@ const DashboardTab = ({
           slaAtual={Number(slaAnalysis?.taxaNoPrazo) || 0}
           avgAge={Number(backlogAnalysis?.avgAge) || 0}
           oldest={backlogAnalysis?.oldestOrder?.daysOpen || 0}
+          stcGtcAnalysis={stcGtcAnalysis}
         />
       </div>
+
+      <RmTypeComparisonCard rmTypeComparison={rmTypeComparison} />
 
       <SectionLabel title="Tendências ao Longo do Tempo" description="Escolha um período pronto, um intervalo específico, ou ajuste manualmente pela barra" />
 

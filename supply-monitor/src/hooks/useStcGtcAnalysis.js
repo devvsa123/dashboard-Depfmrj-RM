@@ -19,73 +19,110 @@ const median = (arr) => {
 };
 
 const TYPES = ["STC", "GTC"];
+const META_SLA_DIAS = 20;
 
-// Tempo total do processo (liberação -> expedição) para pedidos finalizados
-// com STC/GTC, a tendência mensal desses tempos e o quanto ainda está
-// pendente (com STC/GTC atribuído, mas ainda não expedido). RMs sem STC
-// nem GTC são ignoradas aqui de propósito — essa é uma leitura sobre a
+const AGING_BUCKET_DEFS = [
+  { name: '0-7 dias', min: 0, max: 7 },
+  { name: '8-15 dias', min: 8, max: 15 },
+  { name: '16-30 dias', min: 16, max: 30 },
+  { name: '30+ dias', min: 31, max: Infinity }
+];
+
+const statusOf = (item) => String(item.STATUS || "").toUpperCase().trim();
+
+// Tempo total do processo (liberação -> expedição), sua tendência mensal, e
+// a situação dos DOCUMENTOS STC/GTC (não dos pedidos) — um mesmo STC ou GTC
+// agrupa vários pedidos, então "quantos STC eu tenho" é uma pergunta sobre
+// valores distintos da coluna STC, não sobre linhas da planilha. RMs sem
+// STC nem GTC são ignoradas de propósito — essa é uma leitura sobre a
 // saúde dos documentos, não sobre a fila geral (isso já está na aba "RM em
 // processamento").
 export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
   return useMemo(() => {
-    const empty = { groups: [], monthlyTrend: [], pending: [], pendingOrders: [], completionRate: [], hasData: false };
+    const empty = { groups: [], monthlyTrend: [], documents: [], pendingOrders: [], hasData: false };
     if (!data.length) return empty;
 
-    // --- Snapshot atual: o que tem STC/GTC e ainda não foi expedido ---
-    // Não depende do período selecionado no dashboard — é sempre "agora".
-    const pendingOrdersByType = { STC: [], GTC: [] };
+    // Agrupa cada pedido pelo valor distinto da coluna STC (o "documento").
+    const docsByType = { STC: new Map(), GTC: new Map() };
     data.forEach(item => {
       const type = classifyStc(item.STC);
       if (!type) return;
-      const status = String(item.STATUS || "").toUpperCase().trim();
-      if (status === "EXPEDIDO" || status === "CANCELADO") return;
-
-      const entryDateIso = safeGetISODate(item.DATA_ENTRADA);
-      let daysOpen = 0;
-      if (entryDateIso) {
-        daysOpen = Math.floor((new Date() - new Date(entryDateIso)) / (1000 * 60 * 60 * 24));
-      }
-      pendingOrdersByType[type].push({ ...item, tipoDocumento: type, daysOpen, entryDateIso });
+      const key = String(item.STC).trim().toUpperCase();
+      if (!docsByType[type].has(key)) docsByType[type].set(key, []);
+      docsByType[type].get(key).push(item);
     });
 
-    const pending = TYPES.map(type => {
-      const orders = pendingOrdersByType[type].sort((a, b) => b.daysOpen - a.daysOpen);
+    const today = new Date();
+    const pendingOrders = [];
+
+    // --- Situação de cada documento (agora, sem depender do período) ---
+    // Concluído: todos os pedidos não cancelados já foram expedidos.
+    // Parcial: alguns expedidos, outros ainda não.
+    // Pendente: nenhum pedido do documento foi expedido ainda.
+    const documents = TYPES.map(type => {
+      let completedDocuments = 0, partialDocuments = 0, pendingDocuments = 0;
+      const pedidosPendentes = [];
+      const agingBuckets = AGING_BUCKET_DEFS.map(b => ({ ...b, count: 0 }));
+
+      docsByType[type].forEach((pedidosDoDocumento, stcKey) => {
+        const naoCancelados = pedidosDoDocumento.filter(p => statusOf(p) !== "CANCELADO");
+        if (naoCancelados.length === 0) return; // documento 100% cancelado: fora da análise de "aberto"
+
+        const expedidos = naoCancelados.filter(p => statusOf(p) === "EXPEDIDO");
+        const pendentes = naoCancelados.filter(p => statusOf(p) !== "EXPEDIDO");
+
+        if (pendentes.length === 0) completedDocuments++;
+        else if (expedidos.length > 0) partialDocuments++;
+        else pendingDocuments++;
+
+        pendentes.forEach(p => {
+          const entryDateIso = safeGetISODate(p.DATA_ENTRADA);
+          const daysOpen = entryDateIso ? Math.floor((today - new Date(entryDateIso)) / (1000 * 60 * 60 * 24)) : 0;
+          const enriched = { ...p, tipoDocumento: type, stcKey, daysOpen, entryDateIso };
+          pedidosPendentes.push(enriched);
+          const bucket = agingBuckets.find(b => daysOpen >= b.min && daysOpen <= b.max);
+          if (bucket) bucket.count++;
+        });
+      });
+
+      pendingOrders.push(...pedidosPendentes);
+      pedidosPendentes.sort((a, b) => b.daysOpen - a.daysOpen);
+
+      const totalDocuments = completedDocuments + partialDocuments + pendingDocuments;
+      const openDocuments = partialDocuments + pendingDocuments;
+      const completionRate = totalDocuments > 0 ? parseFloat(((completedDocuments / totalDocuments) * 100).toFixed(1)) : null;
+      const avgAgePendentes = pedidosPendentes.length ? parseFloat((pedidosPendentes.reduce((acc, o) => acc + o.daysOpen, 0) / pedidosPendentes.length).toFixed(1)) : 0;
+
       return {
         type,
-        count: orders.length,
-        avgAge: orders.length ? parseFloat((orders.reduce((acc, o) => acc + o.daysOpen, 0) / orders.length).toFixed(1)) : 0,
-        oldestOrder: orders[0] || null
+        totalDocuments, completedDocuments, partialDocuments, pendingDocuments, openDocuments,
+        completionRate,
+        pedidosPendentesCount: pedidosPendentes.length,
+        avgAgePendentes,
+        oldestPendente: pedidosPendentes[0] || null,
+        agingBuckets,
+        daysToClear: null // preenchido abaixo, depende do ritmo do período selecionado
       };
     });
-    const pendingOrders = [...pendingOrdersByType.STC, ...pendingOrdersByType.GTC].sort((a, b) => b.daysOpen - a.daysOpen);
 
-    // --- Taxa de conclusão: dos que já têm STC/GTC, quantos já saíram? ---
-    const expedidoCountByType = { STC: 0, GTC: 0 };
-    data.forEach(item => {
-      const type = classifyStc(item.STC);
-      if (!type) return;
-      if (String(item.STATUS || "").toUpperCase().trim() === "EXPEDIDO") expedidoCountByType[type] += 1;
-    });
-    const completionRate = TYPES.map(type => {
-      const expedido = expedidoCountByType[type];
-      const total = expedido + pendingOrdersByType[type].length;
-      return { type, rate: total > 0 ? parseFloat(((expedido / total) * 100).toFixed(1)) : null, expedido, total };
-    });
+    pendingOrders.sort((a, b) => b.daysOpen - a.daysOpen);
 
-    if (!chartData.length) return { ...empty, pending, pendingOrders, completionRate };
+    if (!chartData.length) return { groups: [], monthlyTrend: [], documents, pendingOrders, hasData: documents.some(d => d.totalDocuments > 0) };
 
     // --- Tempo de processo (liberação -> expedição) no período selecionado ---
     const startIndex = visibleRange ? visibleRange.startIndex : 0;
     const endIndex = visibleRange ? visibleRange.endIndex : chartData.length - 1;
     const startDate = new Date(chartData[startIndex]?.date);
     const endDate = new Date(chartData[endIndex]?.date);
+    const numDias = endIndex - startIndex + 1;
 
     const leadTimesByType = { STC: [], GTC: [] };
+    const documentsSeenByType = { STC: new Set(), GTC: new Set() };
+    const onTimeCountByType = { STC: 0, GTC: 0 };
     const monthlyByType = {}; // { 'YYYY-MM': { STC: [dias...], GTC: [dias...] } }
 
     data.forEach(item => {
-      const status = String(item.STATUS || "").toUpperCase().trim();
-      if (status !== "EXPEDIDO") return;
+      if (statusOf(item) !== "EXPEDIDO") return;
 
       const type = classifyStc(item.STC);
       if (!type) return;
@@ -101,6 +138,8 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
       if (diffDays < 0) return;
 
       leadTimesByType[type].push(diffDays);
+      documentsSeenByType[type].add(String(item.STC).trim().toUpperCase());
+      if (diffDays <= META_SLA_DIAS) onTimeCountByType[type]++;
 
       const monthKey = sepStr.substring(0, 7);
       if (!monthlyByType[monthKey]) monthlyByType[monthKey] = { STC: [], GTC: [] };
@@ -111,10 +150,21 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
       const times = leadTimesByType[type];
       return {
         type,
-        count: times.length,
+        pedidoCount: times.length,
+        documentCount: documentsSeenByType[type].size,
         avgDays: parseFloat(average(times).toFixed(1)),
-        medianDays: parseFloat(median(times).toFixed(1))
+        medianDays: parseFloat(median(times).toFixed(1)),
+        onTimeRate: times.length > 0 ? parseFloat(((onTimeCountByType[type] / times.length) * 100).toFixed(1)) : null
       };
+    });
+
+    // Previsão de zeragem por tipo: no ritmo de expedição do período
+    // selecionado, quantos dias faltam para zerar os pedidos pendentes
+    // daquele tipo?
+    const groupsByType = Object.fromEntries(groups.map(g => [g.type, g]));
+    documents.forEach(doc => {
+      const throughputPerDay = numDias > 0 ? groupsByType[doc.type].pedidoCount / numDias : 0;
+      doc.daysToClear = throughputPerDay > 0 ? parseFloat((doc.pedidosPendentesCount / throughputPerDay).toFixed(1)) : null;
     });
 
     const monthlyTrend = Object.entries(monthlyByType)
@@ -130,10 +180,9 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
     return {
       groups,
       monthlyTrend,
-      pending,
+      documents,
       pendingOrders,
-      completionRate,
-      hasData: groups.some(g => g.count > 0)
+      hasData: groups.some(g => g.pedidoCount > 0) || documents.some(d => d.totalDocuments > 0)
     };
   }, [data, chartData, visibleRange]);
 };

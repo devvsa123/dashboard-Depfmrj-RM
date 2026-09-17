@@ -3,9 +3,12 @@ import { useState } from 'react';
 const STORAGE_KEY = 'supplyGoals';
 
 const DEFAULT_GOALS = {
-  slaTarget: 90,       // % de pedidos expedidos até o prazo (meta mínima)
-  maxBacklogAge: 15,   // dias — idade média aceitável da fila
-  maxOldestOrder: 30   // dias — idade máxima aceitável do pedido mais antigo
+  slaTarget: 90,          // % de pedidos expedidos até o prazo (meta mínima)
+  maxBacklogAge: 15,      // dias — idade média aceitável da fila
+  maxOldestOrder: 30,     // dias — idade máxima aceitável do pedido mais antigo
+  stcSlaTarget: 90,       // % de pedidos com STC expedidos até o prazo
+  gtcSlaTarget: 90,       // % de pedidos com GTC expedidos até o prazo
+  docCompletionTarget: 70 // % mínimo de documentos (STC ou GTC) totalmente concluídos
 };
 
 // Metas gerenciais editáveis pelo usuário, persistidas no navegador.
