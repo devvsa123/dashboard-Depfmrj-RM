@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Upload, Loader2, Activity, Clock, LayoutDashboard, Hourglass,
-  RefreshCw, Network, Database, Search, AlertCircle
+  RefreshCw, Network, Database, Search, AlertCircle, Users
 } from 'lucide-react';
 import { downloadExcel } from './utils/spreadsheet';
 import { useSpreadsheetSync } from './hooks/useSpreadsheetSync';
@@ -15,10 +15,13 @@ import { useGoals } from './hooks/useGoals';
 import { useRiskAlerts } from './hooks/useRiskAlerts';
 import { useStcGtcAnalysis } from './hooks/useStcGtcAnalysis';
 import { useRmTypeComparison } from './hooks/useRmTypeComparison';
+import { useCamAnalysis } from './hooks/useCamAnalysis';
+import { useTrendForecast } from './hooks/useTrendForecast';
 import DashboardTab from './components/DashboardTab';
 import BacklogTab from './components/BacklogTab';
 import InterfaceTab from './components/InterfaceTab';
 import EmailSearchTab from './components/EmailSearchTab';
+import CamAnalysisTab from './components/CamAnalysisTab';
 import HealthBadge from './components/HealthBadge';
 
 const App = () => {
@@ -44,6 +47,8 @@ const App = () => {
   const { goals, updateGoals } = useGoals();
   const stcGtcAnalysis = useStcGtcAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const rmTypeComparison = useRmTypeComparison(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
+  const camAnalysis = useCamAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
+  const trendForecast = useTrendForecast(dashboardAnalytics.chartData);
   const riskAlerts = useRiskAlerts({
     backlogAnalysis: backlogAnalysis.backlogAnalysis,
     interfaceAnalysis: interfaceAnalysis.interfaceAnalysis,
@@ -103,6 +108,7 @@ const App = () => {
               <button onClick={() => setActiveTab('backlog')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'backlog' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Hourglass size={16} /> RM em processamento</button>
               <button onClick={() => setActiveTab('interface')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'interface' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Network size={16} /> Interface SINGRA x WMS</button>
               <button onClick={() => setActiveTab('email')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'email' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Search size={16} /> Busca por E-mail</button>
+              <button onClick={() => setActiveTab('cam')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'cam' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Users size={16} /> Por CAM</button>
             </div>
           )}
         </header>
@@ -134,8 +140,10 @@ const App = () => {
               handleDownloadExcel={downloadExcel}
               periodComparison={dashboardAnalytics.periodComparison}
               comparisonSeries={dashboardAnalytics.comparisonSeries}
+              trendForecast={trendForecast}
               stcGtcAnalysis={stcGtcAnalysis}
               rmTypeComparison={rmTypeComparison}
+              camAnalysis={camAnalysis.camAnalysis}
               interfaceAnalysis={interfaceAnalysis.interfaceAnalysis}
               interfaceStartDate={interfaceAnalysis.interfaceStartDate}
               setInterfaceStartDate={interfaceAnalysis.setInterfaceStartDate}
@@ -186,6 +194,16 @@ const App = () => {
               handleSaveSearch={emailExtractor.handleSaveSearch}
               handleDeleteSearch={emailExtractor.handleDeleteSearch}
               handleDownloadExcel={downloadExcel}
+            />
+          ) : activeTab === 'cam' ? (
+            <CamAnalysisTab
+              rows={camAnalysis.rows}
+              summary={camAnalysis.summary}
+              search={camAnalysis.search}
+              setSearch={camAnalysis.setSearch}
+              sortKey={camAnalysis.sortKey}
+              sortDir={camAnalysis.sortDir}
+              toggleSort={camAnalysis.toggleSort}
             />
           ) : null
         ) : (

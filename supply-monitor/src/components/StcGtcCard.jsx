@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Clock, TrendingUp, FileWarning, CheckCircle2, FileStack } from 'lucide-react';
+import { Clock, TrendingUp, CheckCircle2, FileStack } from 'lucide-react';
 import InfoButton from './InfoButton';
-import StcGtcPendingModal from './StcGtcPendingModal';
+import StcGtcDocumentsModal from './StcGtcDocumentsModal';
 
 const TYPE_LABEL = { STC: 'STC', GTC: 'GTC' };
 const TYPE_COLOR = { STC: '#6366f1', GTC: '#f59e0b' };
@@ -12,21 +12,14 @@ const TYPE_COLOR = { STC: '#6366f1', GTC: '#f59e0b' };
 // documento agrupa vários pedidos, então a contagem "quantos STC/GTC eu
 // tenho" precisa ser sobre valores distintos, não sobre linhas da planilha.
 const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
-  const [pendingType, setPendingType] = useState(null);
-  const { groups, monthlyTrend, documents, pendingOrders, hasData } = stcGtcAnalysis;
+  const [selection, setSelection] = useState(null);
+  const { groups, monthlyTrend, documents, hasData } = stcGtcAnalysis;
 
   const hasDocuments = documents.some(d => d.totalDocuments > 0);
-  const agingChartData = documents.length
-    ? documents[0].agingBuckets.map((bucket, idx) => ({
-        name: bucket.name,
-        STC: documents[0].agingBuckets[idx]?.count || 0,
-        GTC: documents[1].agingBuckets[idx]?.count || 0
-      }))
-    : [];
 
   return (
     <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-      <StcGtcPendingModal pendingType={pendingType} setPendingType={setPendingType} pendingOrders={pendingOrders} handleDownloadExcel={handleDownloadExcel} />
+      <StcGtcDocumentsModal selection={selection} setSelection={setSelection} documents={documents} handleDownloadExcel={handleDownloadExcel} />
 
       <div className="flex items-center gap-2 mb-6">
         <Clock className="text-indigo-500" size={20} />
@@ -104,7 +97,7 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Situação dos Documentos (Agora)</p>
               <InfoButton
                 title="Situação dos Documentos"
-                description="Cada STC ou GTC pode agrupar vários pedidos. Concluído: todos os pedidos do documento já foram expedidos. Parcial: parte já saiu, parte ainda não. Pendente: nenhum pedido do documento foi expedido ainda. Documentos 100% cancelados não entram na contagem."
+                description="Cada STC ou GTC pode agrupar vários pedidos. Concluído: todos os pedidos do documento já foram expedidos. Parcial: parte já saiu, parte ainda não. Pendente: nenhum pedido do documento foi expedido ainda. Documentos 100% cancelados não entram na contagem. Clique em Parciais ou Pendentes para ver quais STC/GTC estão nessa situação e para qual CAM."
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -120,7 +113,7 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
                       <p className="text-[9px] font-bold text-emerald-600 uppercase">Concluídos</p>
                     </div>
                     <button
-                      onClick={() => doc.partialDocuments > 0 && setPendingType(doc.type)}
+                      onClick={() => doc.partialDocuments > 0 && setSelection({ type: doc.type, situacao: 'parcial' })}
                       disabled={doc.partialDocuments === 0}
                       className={`p-2.5 rounded-xl border text-center transition-all ${doc.partialDocuments > 0 ? 'bg-amber-50 border-amber-100 hover:shadow-sm cursor-pointer' : 'bg-slate-100 border-slate-100 cursor-default'}`}
                     >
@@ -128,7 +121,7 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
                       <p className={`text-[9px] font-bold uppercase ${doc.partialDocuments > 0 ? 'text-amber-600' : 'text-slate-400'}`}>Parciais</p>
                     </button>
                     <button
-                      onClick={() => doc.pendingDocuments > 0 && setPendingType(doc.type)}
+                      onClick={() => doc.pendingDocuments > 0 && setSelection({ type: doc.type, situacao: 'pendente' })}
                       disabled={doc.pendingDocuments === 0}
                       className={`p-2.5 rounded-xl border text-center transition-all ${doc.pendingDocuments > 0 ? 'bg-red-50 border-red-100 hover:shadow-sm cursor-pointer' : 'bg-slate-100 border-slate-100 cursor-default'}`}
                     >
@@ -153,28 +146,6 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
               </div>
             )}
           </div>
-
-          {agingChartData.some(d => d.STC > 0 || d.GTC > 0) && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <FileWarning size={14} className="text-slate-400" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Envelhecimento dos Documentos Pendentes</p>
-                <InfoButton title="Envelhecimento" description="Distribui os documentos STC/GTC ainda em aberto (parciais ou pendentes) por tempo desde a entrada do seu pedido mais antigo não expedido — o item que está de fato travando o documento. Cada documento conta uma única vez, mesmo que tenha vários pedidos pendentes." />
-              </div>
-              <div className="h-[220px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agingChartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700 }} axisLine={false} />
-                    <YAxis tick={{ fontSize: 10 }} axisLine={false} allowDecimals={false} />
-                    <Tooltip /><Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: '11px' }} />
-                    <Bar dataKey="STC" fill={TYPE_COLOR.STC} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="GTC" fill={TYPE_COLOR.GTC} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

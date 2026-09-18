@@ -110,12 +110,14 @@ const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setCom
       )}
 
       {/* Documento estático usado apenas para gerar o PDF — nunca aparece na
-          tela, sempre reflete o mês escolhido acima. O wrapper de tamanho
-          zero com overflow:hidden é proposital: manter o documento perto da
-          origem (0,0), em vez de jogá-lo para fora da tela com uma margem
-          negativa enorme, evita que o html2canvas calcule posições erradas
-          ao capturá-lo (um problema conhecido da biblioteca). */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+          tela, sempre reflete o mês escolhido acima. Fica na origem (0,0),
+          em vez de jogá-lo para fora da tela com uma margem negativa enorme
+          (isso já causou o html2canvas calcular posições erradas ao
+          capturá-lo). Escondido via opacity+z-index, e não via
+          width:0/overflow:hidden — um ancestral de tamanho zero estava
+          fazendo o html2canvas capturar a largura errada (cortando as
+          últimas colunas das tabelas no PDF). */}
+      <div style={{ position: 'absolute', top: 0, left: 0, opacity: 0, zIndex: -1, pointerEvents: 'none' }} aria-hidden="true">
         <ReportDocument ref={reportRef} monthLabel={monthLabel} periodLabel={periodLabel} comparisonLabel={comparisonLabel} {...reportProps} />
       </div>
     </div>

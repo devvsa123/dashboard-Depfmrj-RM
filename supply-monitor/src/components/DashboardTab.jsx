@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import {
   Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ComposedChart, Bar, Area, PieChart, Pie, Cell, BarChart
+  ComposedChart, Bar, Area, PieChart, Pie, Cell, BarChart, ReferenceLine
 } from 'recharts';
 import {
   TrendingUp, CheckCircle2, Sparkles, Loader2, Target, Clock,
@@ -63,7 +63,7 @@ const DashboardTab = ({
   selectedDateRange, activePresetKey, applyPreset, applyCustomRange,
   comparisonMode, setComparisonMode,
   selectedPiSegment, setSelectedPiSegment, data, handleDownloadExcel,
-  periodComparison, comparisonSeries, stcGtcAnalysis, rmTypeComparison, interfaceAnalysis,
+  periodComparison, comparisonSeries, trendForecast, stcGtcAnalysis, rmTypeComparison, camAnalysis, interfaceAnalysis,
   interfaceStartDate, setInterfaceStartDate, interfaceEndDate, setInterfaceEndDate,
   health, alerts, onNavigate, goals, updateGoals,
   yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics
@@ -71,6 +71,23 @@ const DashboardTab = ({
   const estimativaZerarFila = selectionSummary?.mediaSeparacoesPeriodo > 0 ? (backlogAnalysis?.totalPending / selectionSummary.mediaSeparacoesPeriodo).toFixed(1) : "indefinido";
   const comparisonLabel = COMPARISON_LABEL[comparisonMode] || 'vs. período anterior';
   const reportRef = useRef(null);
+
+  // A previsão só faz sentido emendada no fim da série quando o período
+  // visível vai até o dado mais recente disponível — se o usuário estiver
+  // olhando um recorte antigo, mostrar uma previsão "flutuando" no futuro,
+  // desconectada do que está na tela, mais confunde do que ajuda.
+  const baseTrendSeries = comparisonSeries || visibleRangeData;
+  const isViewingLatestData = chartData.length > 0 && baseTrendSeries.length > 0
+    && baseTrendSeries[baseTrendSeries.length - 1]?.date === chartData[chartData.length - 1]?.date;
+  const showForecast = Boolean(trendForecast?.hasForecast) && isViewingLatestData;
+  const trendSeriesWithForecast = showForecast
+    ? [
+        ...baseTrendSeries.slice(0, -1),
+        { ...baseTrendSeries[baseTrendSeries.length - 1], ma7_entradas_forecast: baseTrendSeries[baseTrendSeries.length - 1].ma7_entradas, ma7_saidas_forecast: baseTrendSeries[baseTrendSeries.length - 1].ma7_separacoes },
+        ...trendForecast.forecastSeries
+      ]
+    : baseTrendSeries;
+  const forecastStartDate = baseTrendSeries.length ? baseTrendSeries[baseTrendSeries.length - 1].date : null;
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
@@ -90,7 +107,7 @@ const DashboardTab = ({
         reportRef={reportRef}
         reportProps={{
           selectionSummary, slaAnalysis, backlogAnalysis, periodComparison, comparisonSeries, visibleRangeData,
-          alerts, health, goals, stcGtcAnalysis, rmTypeComparison, interfaceAnalysis, dynamicAnalysis, yoyAnalysis
+          alerts, health, goals, stcGtcAnalysis, rmTypeComparison, camAnalysis, interfaceAnalysis, dynamicAnalysis, yoyAnalysis
         }}
       />
 
@@ -223,13 +240,16 @@ const DashboardTab = ({
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-2">
              <h3 className="text-lg font-black text-slate-800">Entradas x Saídas ao Longo do Tempo</h3>
-             <InfoButton title="Entradas x Saídas" description="Compara o que entra (Entradas) com o que sai (Saídas) dia a dia. As linhas de média móvel de 7 dias suavizam oscilações diárias para mostrar a tendência real. Com uma comparação de período ativa (acima), as linhas tracejadas mostram o mesmo dia do período de referência, lado a lado com o período atual." />
+             <InfoButton title="Entradas x Saídas" description="Compara o que entra (Entradas) com o que sai (Saídas) dia a dia. As linhas de média móvel de 7 dias suavizam oscilações diárias para mostrar a tendência real. Com uma comparação de período ativa (acima), as linhas tracejadas azul/verde claro mostram o mesmo dia do período de referência. A linha pontilhada em âmbar é a previsão do próximo mês, calculada a partir do que aconteceu no mesmo mês em anos anteriores (sazonalidade), ajustada pelo ritmo recente da operação." />
           </div>
+          {showForecast && (
+            <p className="text-[11px] text-amber-600 font-bold mb-4">Previsão de {trendForecast.monthLabel} com base em {trendForecast.yearsUsed} ano(s) anterior(es)</p>
+          )}
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={comparisonSeries || visibleRangeData}>
+              <ComposedChart data={trendSeriesWithForecast}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" hide />
                 <YAxis tick={{fontSize: 10}} axisLine={false} />
@@ -242,6 +262,13 @@ const DashboardTab = ({
                   <>
                     <Line type="monotone" dataKey="cmp_ma7_entradas" name={`Entradas (${comparisonLabel})`} stroke="#93c5fd" strokeWidth={2} strokeDasharray="5 4" dot={false} />
                     <Line type="monotone" dataKey="cmp_ma7_separacoes" name={`Saídas (${comparisonLabel})`} stroke="#6ee7b7" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                  </>
+                )}
+                {showForecast && (
+                  <>
+                    <ReferenceLine x={forecastStartDate} stroke="#cbd5e1" strokeDasharray="4 4" label={{ value: 'Previsão →', position: 'insideTopRight', fontSize: 10, fill: '#94a3b8', fontWeight: 700 }} />
+                    <Line type="monotone" dataKey="ma7_entradas_forecast" name="Entradas (previsão)" stroke="#f59e0b" strokeWidth={2} strokeDasharray="2 3" dot={false} />
+                    <Line type="monotone" dataKey="ma7_saidas_forecast" name="Saídas (previsão)" stroke="#b45309" strokeWidth={2} strokeDasharray="2 3" dot={false} />
                   </>
                 )}
               </ComposedChart>

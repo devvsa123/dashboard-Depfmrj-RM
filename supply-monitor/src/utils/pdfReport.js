@@ -13,7 +13,11 @@ export const generateMonthlyReportPdf = async (element, { filename }) => {
     image: { type: 'jpeg', quality: 0.95 },
     html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['css', 'legacy'] }
+    // 'before' força uma quebra de página explícita antes de cada bloco
+    // .pdf-section (ver ReportDocument.jsx) — um formato fixo e previsível,
+    // em vez de depender só da heurística de 'legacy'/'css' pra decidir
+    // onde cortar.
+    pagebreak: { mode: ['css', 'legacy'], before: ['.pdf-section'] }
   }).from(element);
 
   await worker.toPdf().get('pdf').then((pdf) => {

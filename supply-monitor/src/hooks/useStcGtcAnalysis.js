@@ -63,6 +63,12 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
       let completedDocuments = 0, partialDocuments = 0, pendingDocuments = 0;
       const pedidosPendentes = [];
       const agingBuckets = AGING_BUCKET_DEFS.map(b => ({ ...b, count: 0 }));
+      // Documentos (não pedidos) em situação parcial ou pendente, com o(s)
+      // CAM(s) associado(s) — é isso que o gestor precisa ver ao clicar em
+      // "Parciais"/"Pendentes": quais STC/GTC estão travados e para quem
+      // (CAM) é a entrega, não a lista crua de pedidos.
+      const partialList = [];
+      const pendingList = [];
 
       docsByType[type].forEach((pedidosDoDocumento, stcKey) => {
         const naoCancelados = pedidosDoDocumento.filter(p => statusOf(p) !== "CANCELADO");
@@ -71,9 +77,10 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
         const expedidos = naoCancelados.filter(p => statusOf(p) === "EXPEDIDO");
         const pendentes = naoCancelados.filter(p => statusOf(p) !== "EXPEDIDO");
 
-        if (pendentes.length === 0) completedDocuments++;
-        else if (expedidos.length > 0) partialDocuments++;
-        else pendingDocuments++;
+        let situacao = null;
+        if (pendentes.length === 0) { completedDocuments++; }
+        else if (expedidos.length > 0) { partialDocuments++; situacao = 'parcial'; }
+        else { pendingDocuments++; situacao = 'pendente'; }
 
         // Idade do DOCUMENTO = idade do seu pedido pendente mais antigo (o
         // item que está de fato travando o documento). O balde de
@@ -81,16 +88,37 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
         // senão um único STC parcial com vários pedidos pendentes inflaria
         // a contagem várias vezes.
         let oldestDaysOpenDoDocumento = 0;
-        pendentes.forEach(p => {
+        const pendentesEnriquecidos = pendentes.map(p => {
           const entryDateIso = safeGetISODate(p.DATA_ENTRADA);
           const daysOpen = entryDateIso ? Math.floor((today - new Date(entryDateIso)) / (1000 * 60 * 60 * 24)) : 0;
           const enriched = { ...p, tipoDocumento: type, stcKey, daysOpen, entryDateIso };
           pedidosPendentes.push(enriched);
           if (daysOpen > oldestDaysOpenDoDocumento) oldestDaysOpenDoDocumento = daysOpen;
+          return enriched;
         });
         const bucket = agingBuckets.find(b => oldestDaysOpenDoDocumento >= b.min && oldestDaysOpenDoDocumento <= b.max);
         if (bucket) bucket.count++;
+
+        if (situacao) {
+          const camList = Array.from(new Set(naoCancelados.map(p => String(p.CAM || '').trim()).filter(Boolean)));
+          const avgDaysOpen = pendentesEnriquecidos.length
+            ? parseFloat((pendentesEnriquecidos.reduce((acc, p) => acc + p.daysOpen, 0) / pendentesEnriquecidos.length).toFixed(1))
+            : 0;
+          const docSummary = {
+            stcKey, type, situacao,
+            camList: camList.length ? camList : ['Sem CAM'],
+            pedidosCount: naoCancelados.length,
+            pedidosPendentesCount: pendentesEnriquecidos.length,
+            oldestDaysOpen: oldestDaysOpenDoDocumento,
+            avgDaysOpen,
+            pedidos: pendentesEnriquecidos
+          };
+          (situacao === 'parcial' ? partialList : pendingList).push(docSummary);
+        }
       });
+
+      partialList.sort((a, b) => b.oldestDaysOpen - a.oldestDaysOpen);
+      pendingList.sort((a, b) => b.oldestDaysOpen - a.oldestDaysOpen);
 
       pendingOrders.push(...pedidosPendentes);
       pedidosPendentes.sort((a, b) => b.daysOpen - a.daysOpen);
@@ -108,6 +136,8 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
         avgAgePendentes,
         oldestPendente: pedidosPendentes[0] || null,
         agingBuckets,
+        partialList,
+        pendingList,
         daysToClear: null // preenchido abaixo, depende do ritmo do período selecionado
       };
     });
