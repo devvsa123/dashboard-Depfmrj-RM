@@ -82,6 +82,20 @@ const computeSlaRate = (data, startDate, endDate) => {
   return expedidosTotal > 0 ? (expedidosNoPrazo / expedidosTotal) * 100 : 0;
 };
 
+// Acha o período de referência para comparação: o período anterior de
+// mesma duração, ou o mesmo período um ano antes.
+const computeComparisonIndices = (chartData, startIndex, endIndex, mode) => {
+  if (mode === 'yearOverYear') {
+    const startIso = shiftYears(chartData[startIndex].date, -1);
+    const endIso = shiftYears(chartData[endIndex].date, -1);
+    return computeRangeIndices(chartData, startIso, endIso);
+  }
+  const windowSize = endIndex - startIndex + 1;
+  const prevEndIndex = startIndex - 1;
+  const prevStartIndex = prevEndIndex - windowSize + 1;
+  return prevStartIndex >= 0 ? { startIndex: prevStartIndex, endIndex: prevEndIndex } : null;
+};
+
 const summarizeWindow = (chartData, data, fromIdx, toIdx) => {
   const slice = chartData.slice(fromIdx, toIdx + 1);
   const entradas = slice.reduce((acc, curr) => acc + (curr.entradas || 0), 0);
@@ -276,17 +290,7 @@ export const useDashboardAnalytics = (data) => {
     const startIndex = visibleRange ? visibleRange.startIndex : 0;
     const endIndex = visibleRange ? visibleRange.endIndex : chartData.length - 1;
 
-    let comparisonIndices = null;
-    if (comparisonMode === 'yearOverYear') {
-      const startIso = shiftYears(chartData[startIndex].date, -1);
-      const endIso = shiftYears(chartData[endIndex].date, -1);
-      comparisonIndices = computeRangeIndices(chartData, startIso, endIso);
-    } else {
-      const windowSize = endIndex - startIndex + 1;
-      const prevEndIndex = startIndex - 1;
-      const prevStartIndex = prevEndIndex - windowSize + 1;
-      comparisonIndices = prevStartIndex >= 0 ? { startIndex: prevStartIndex, endIndex: prevEndIndex } : null;
-    }
+    const comparisonIndices = computeComparisonIndices(chartData, startIndex, endIndex, comparisonMode);
     if (!comparisonIndices) return null; // não há histórico suficiente para comparar
 
     const current = summarizeWindow(chartData, data, startIndex, endIndex);
@@ -309,10 +313,40 @@ export const useDashboardAnalytics = (data) => {
     };
   }, [data, chartData, visibleRange, comparisonMode]);
 
+  // Série dia-a-dia para sobrepor nos gráficos: o dia N do período
+  // selecionado ao lado do dia N do período de referência (mesma posição
+  // relativa, não a mesma data — por isso os dois períodos têm datas
+  // diferentes, mas comparam "dia 1 com dia 1"). Sem isso, o modo de
+  // comparação só mudava os selos de variação dos KPIs, sem nenhum efeito
+  // visível nos gráficos de tendência.
+  const comparisonSeries = useMemo(() => {
+    if (chartData.length === 0 || comparisonMode === 'none') return null;
+    const startIndex = visibleRange ? visibleRange.startIndex : 0;
+    const endIndex = visibleRange ? visibleRange.endIndex : chartData.length - 1;
+
+    const comparisonIndices = computeComparisonIndices(chartData, startIndex, endIndex, comparisonMode);
+    if (!comparisonIndices) return null;
+
+    const windowSize = Math.min(endIndex - startIndex + 1, comparisonIndices.endIndex - comparisonIndices.startIndex + 1);
+    const series = [];
+    for (let i = 0; i < windowSize; i++) {
+      const current = chartData[startIndex + i];
+      const reference = chartData[comparisonIndices.startIndex + i];
+      series.push({
+        ...current,
+        cmp_date: reference.date,
+        cmp_ma7_entradas: reference.ma7_entradas,
+        cmp_ma7_separacoes: reference.ma7_separacoes,
+        cmp_leadTimeMa7: reference.leadTimeMa7
+      });
+    }
+    return series;
+  }, [chartData, visibleRange, comparisonMode]);
+
   return {
     chartData, visibleRange, setVisibleRange, visibleRangeData, selectedDateRange,
     activePresetKey, applyPreset, applyCustomRange,
     comparisonMode, setComparisonMode,
-    selectionSummary, slaAnalysis, dynamicAnalysis, periodComparison
+    selectionSummary, slaAnalysis, dynamicAnalysis, periodComparison, comparisonSeries
   };
 };

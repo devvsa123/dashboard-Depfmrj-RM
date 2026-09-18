@@ -61,7 +61,7 @@ const DashboardTab = ({
   selectedDateRange, activePresetKey, applyPreset, applyCustomRange,
   comparisonMode, setComparisonMode,
   selectedPiSegment, setSelectedPiSegment, data, handleDownloadExcel,
-  periodComparison, stcGtcAnalysis, rmTypeComparison, interfaceAnalysis,
+  periodComparison, comparisonSeries, stcGtcAnalysis, rmTypeComparison, interfaceAnalysis,
   interfaceStartDate, setInterfaceStartDate, interfaceEndDate, setInterfaceEndDate,
   health, alerts, onNavigate, goals, updateGoals,
   yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics
@@ -210,11 +210,11 @@ const DashboardTab = ({
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-6">
              <h3 className="text-lg font-black text-slate-800">Entradas x Saídas ao Longo do Tempo</h3>
-             <InfoButton title="Entradas x Saídas" description="Compara o que entra (Entradas) com o que sai (Saídas) dia a dia. As linhas de média móvel de 7 dias suavizam oscilações diárias para mostrar a tendência real." />
+             <InfoButton title="Entradas x Saídas" description="Compara o que entra (Entradas) com o que sai (Saídas) dia a dia. As linhas de média móvel de 7 dias suavizam oscilações diárias para mostrar a tendência real. Com uma comparação de período ativa (acima), as linhas tracejadas mostram o mesmo dia do período de referência, lado a lado com o período atual." />
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={visibleRangeData}>
+              <ComposedChart data={comparisonSeries || visibleRangeData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" hide />
                 <YAxis tick={{fontSize: 10}} axisLine={false} />
@@ -223,6 +223,12 @@ const DashboardTab = ({
                 <Bar dataKey="entradas" name="Volume de Entrada" fill="#e2e8f0" barSize={8} radius={[4,4,0,0]} />
                 <Line type="monotone" dataKey="ma7_entradas" name="Média de Entradas (7 dias)" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
                 <Line type="monotone" dataKey="ma7_separacoes" name="Média de Saídas (7 dias)" stroke="#10b981" strokeWidth={2.5} dot={false} />
+                {comparisonSeries && (
+                  <>
+                    <Line type="monotone" dataKey="cmp_ma7_entradas" name={`Entradas (${comparisonLabel})`} stroke="#93c5fd" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                    <Line type="monotone" dataKey="cmp_ma7_separacoes" name={`Saídas (${comparisonLabel})`} stroke="#6ee7b7" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                  </>
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -231,13 +237,13 @@ const DashboardTab = ({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-black text-slate-800">Tempo de Atendimento</h3>
-              <InfoButton title="Tempo de Atendimento" description="Evolução diária do tempo de atendimento (Lead Time). A área sombreada mostra o desvio, indicando dias de maior instabilidade no processo." />
+              <InfoButton title="Tempo de Atendimento" description="Evolução diária do tempo de atendimento (Lead Time). A área sombreada mostra o desvio, indicando dias de maior instabilidade no processo. Com uma comparação de período ativa, a linha tracejada mostra o mesmo dia do período de referência." />
             </div>
             <div className="bg-indigo-50 px-3 py-1 rounded-full text-[10px] text-indigo-600 font-black">{selectionSummary?.numDias} DIAS NO PERÍODO</div>
           </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={visibleRangeData}>
+              <ComposedChart data={comparisonSeries || visibleRangeData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" tick={{fontSize: 9}} tickFormatter={v => v.split('-')[2]} />
                 <YAxis unit="d" tick={{fontSize: 10}} axisLine={false} />
@@ -246,6 +252,9 @@ const DashboardTab = ({
                 <Area type="monotone" dataKey="channelLower" stackId="volStack" stroke="none" fill="transparent" legendType="none" />
                 <Area type="monotone" dataKey="channelHeight" name="Variação (Desvio)" stackId="volStack" stroke="none" fill="#d8b4fe" opacity={0.3} />
                 <Line type="monotone" dataKey="leadTimeMa7" name="Média de Atendimento (7 dias)" stroke="#7c3aed" strokeWidth={3} dot={false} />
+                {comparisonSeries && (
+                  <Line type="monotone" dataKey="cmp_leadTimeMa7" name={`Atendimento (${comparisonLabel})`} stroke="#c4b5fd" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>

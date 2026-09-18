@@ -133,6 +133,7 @@ const App = () => {
               data={data}
               handleDownloadExcel={downloadExcel}
               periodComparison={dashboardAnalytics.periodComparison}
+              comparisonSeries={dashboardAnalytics.comparisonSeries}
               stcGtcAnalysis={stcGtcAnalysis}
               rmTypeComparison={rmTypeComparison}
               interfaceAnalysis={interfaceAnalysis.interfaceAnalysis}
