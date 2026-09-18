@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { FileDown, Loader2, AlertCircle } from 'lucide-react';
 import InfoButton from './InfoButton';
 import { generateMonthlyReportPdf } from '../utils/pdfReport';
+import ReportDocument from './report/ReportDocument';
 
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -17,11 +18,13 @@ const monthBoundsOf = (monthKey) => {
 const formatBr = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('pt-BR');
 
 // Botão para gerar o PDF (A4) do mês escolhido, pronto para arquivar como
-// anexo de ata: aplica o período daquele mês (reaproveitando o mesmo
-// mecanismo do seletor de período), garante uma comparação com o período
-// anterior, espera o dashboard recalcular e os gráficos assentarem, e
-// então captura o conteúdo já renderizado em um PDF.
-const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setComparisonMode, reportRef }) => {
+// anexo de ata. Aplica o período daquele mês (reaproveitando o mesmo
+// mecanismo do seletor de período) e garante uma comparação com o período
+// anterior, para que os dados corretos cheguem ao <ReportDocument>. O que é
+// de fato capturado em PDF não é a tela do dashboard, e sim o documento
+// estático renderizado fora da tela por <ReportDocument> — ver o motivo no
+// comentário daquele componente.
+const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setComparisonMode, reportRef, reportProps }) => {
   const availableMonths = useMemo(() => {
     const months = new Set(chartData.map(d => d.date.substring(0, 7)));
     return Array.from(months).sort().reverse();
@@ -33,6 +36,17 @@ const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setCom
 
   if (availableMonths.length === 0) return null;
 
+  const monthLabel = monthLabelOf(selectedMonth);
+  const { start, end } = selectedMonth ? monthBoundsOf(selectedMonth) : {};
+  const periodLabel = start ? `${formatBr(start)} a ${formatBr(end)}` : '';
+
+  let comparisonLabel = null;
+  if (comparisonMode !== 'none' && reportProps.periodComparison?.referenceDates) {
+    const { startDate, endDate } = reportProps.periodComparison.referenceDates;
+    const suffix = comparisonMode === 'yearOverYear' ? 'mesmo período, ano anterior' : 'período imediatamente anterior';
+    comparisonLabel = `${formatBr(startDate)} a ${formatBr(endDate)} (${suffix})`;
+  }
+
   const handleGenerateReport = async () => {
     if (!selectedMonth) return;
     setIsGenerating(true);
@@ -43,17 +57,12 @@ const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setCom
       if (comparisonMode === 'none') setComparisonMode('previous');
 
       // Aguarda o React recalcular todos os indicadores para o novo período
-      // e as animações dos gráficos (Recharts) terminarem antes de capturar
-      // a tela — senão o PDF pode sair com gráficos pela metade.
-      await new Promise(resolve => setTimeout(resolve, 1800));
+      // antes de capturar o documento — o <ReportDocument> desabilita as
+      // animações dos gráficos, então não é preciso esperar por elas.
+      await new Promise(resolve => setTimeout(resolve, 2500));
 
-      const monthLabel = monthLabelOf(selectedMonth);
-      const comparisonSuffix = comparisonMode === 'yearOverYear' ? ' (mesmo período, ano anterior)' : ' (período imediatamente anterior)';
       await generateMonthlyReportPdf(reportRef.current, {
-        filename: `Relatorio_Indicadores_${selectedMonth}.pdf`,
-        title: `Relatório de Indicadores — ${monthLabel}`,
-        periodLabel: `${formatBr(start)} a ${formatBr(end)}`,
-        comparisonLabel: comparisonMode === 'none' ? null : `Período de referência${comparisonSuffix}`
+        filename: `Relatorio_Indicadores_${selectedMonth}.pdf`
       });
     } catch (err) {
       console.error(err);
@@ -73,7 +82,7 @@ const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setCom
         </div>
         <InfoButton
           title="Relatório Mensal"
-          description="Ao gerar, o dashboard muda para o mês escolhido (você verá a tela atualizar) e então baixa um PDF com tudo o que está sendo exibido na aba Indicadores naquele momento, formatado para A4."
+          description="Gera um documento formal (não uma captura da tela): título, seções numeradas, tabelas e gráficos estáticos com os indicadores do mês escolhido."
         />
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -99,6 +108,16 @@ const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setCom
           <AlertCircle size={14} /> {exportError}
         </div>
       )}
+
+      {/* Documento estático usado apenas para gerar o PDF — nunca aparece na
+          tela, sempre reflete o mês escolhido acima. O wrapper de tamanho
+          zero com overflow:hidden é proposital: manter o documento perto da
+          origem (0,0), em vez de jogá-lo para fora da tela com uma margem
+          negativa enorme, evita que o html2canvas calcule posições erradas
+          ao capturá-lo (um problema conhecido da biblioteca). */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+        <ReportDocument ref={reportRef} monthLabel={monthLabel} periodLabel={periodLabel} comparisonLabel={comparisonLabel} {...reportProps} />
+      </div>
     </div>
   );
 };

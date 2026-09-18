@@ -10,7 +10,7 @@ const YEAR_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ec4899', '#0ea5e9', '#8b
 // safras diferentes e identificar padrões que se repetem todo ano.
 const YoySeasonalityCard = ({ yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics }) => {
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 break-inside-avoid">
+    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-6">
         <div className="flex items-center gap-2">
           <Calendar className="text-indigo-500" size={24} />
