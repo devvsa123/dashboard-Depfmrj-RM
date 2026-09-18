@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ComposedChart, Bar, Area, PieChart, Pie, Cell, BarChart
@@ -18,6 +19,7 @@ import DeltaBadge from './DeltaBadge';
 import SectionLabel from './SectionLabel';
 import YoySeasonalityCard from './YoySeasonalityCard';
 import PeriodSelector from './PeriodSelector';
+import MonthlyReportCard from './MonthlyReportCard';
 
 const COMPARISON_LABEL = {
   previous: 'vs. período anterior',
@@ -68,6 +70,7 @@ const DashboardTab = ({
 }) => {
   const estimativaZerarFila = selectionSummary?.mediaSeparacoesPeriodo > 0 ? (backlogAnalysis?.totalPending / selectionSummary.mediaSeparacoesPeriodo).toFixed(1) : "indefinido";
   const comparisonLabel = COMPARISON_LABEL[comparisonMode] || 'vs. período anterior';
+  const reportRef = useRef(null);
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
@@ -79,11 +82,20 @@ const DashboardTab = ({
         data={data}
       />
 
+      <MonthlyReportCard
+        chartData={chartData}
+        applyCustomRange={applyCustomRange}
+        comparisonMode={comparisonMode}
+        setComparisonMode={setComparisonMode}
+        reportRef={reportRef}
+      />
+
+      <div ref={reportRef} className="space-y-6">
       <HealthBanner health={health} alerts={alerts} />
 
       <SectionLabel title="Visão Geral do Período" description="Indicadores do intervalo selecionado no gráfico mais abaixo" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 break-inside-avoid">
         <KpiTile
           icon={LogIn}
           title="Entradas"
@@ -143,7 +155,7 @@ const DashboardTab = ({
         />
       </div>
 
-      <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 break-inside-avoid">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-white/10 rounded-xl"><Sparkles className="text-white" size={22} /></div>
           <div>
@@ -178,7 +190,7 @@ const DashboardTab = ({
 
       <SectionLabel title="Riscos e Metas" description="O que precisa de atenção agora e como estamos em relação ao combinado" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 break-inside-avoid">
         <RiskAlertsPanel alerts={alerts} onNavigate={onNavigate} />
         <GoalsPanel
           goals={goals}
@@ -207,7 +219,7 @@ const DashboardTab = ({
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 break-inside-avoid">
           <div className="flex items-center justify-between mb-6">
              <h3 className="text-lg font-black text-slate-800">Entradas x Saídas ao Longo do Tempo</h3>
              <InfoButton title="Entradas x Saídas" description="Compara o que entra (Entradas) com o que sai (Saídas) dia a dia. As linhas de média móvel de 7 dias suavizam oscilações diárias para mostrar a tendência real. Com uma comparação de período ativa (acima), as linhas tracejadas mostram o mesmo dia do período de referência, lado a lado com o período atual." />
@@ -233,7 +245,7 @@ const DashboardTab = ({
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 break-inside-avoid">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-black text-slate-800">Tempo de Atendimento</h3>
@@ -282,7 +294,7 @@ const DashboardTab = ({
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 break-inside-avoid">
           <div className="flex items-center gap-2 mb-6">
              <XCircle className="text-red-500" size={20} />
              <h3 className="text-lg font-black text-slate-800">Cancelados x Liberados por Mês</h3>
@@ -300,7 +312,7 @@ const DashboardTab = ({
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 break-inside-avoid">
           <div className="flex items-center gap-2 mb-6">
              <Package className="text-amber-500" size={20} />
              <h3 className="text-lg font-black text-slate-800">Documentos Cancelados x Fornecidos</h3>
@@ -324,6 +336,7 @@ const DashboardTab = ({
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

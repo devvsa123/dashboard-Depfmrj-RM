@@ -11,7 +11,7 @@ const RmTypeComparisonCard = ({ rmTypeComparison }) => {
   const { groups, hasData } = rmTypeComparison;
 
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 break-inside-avoid">
       <div className="flex items-center gap-2 mb-6">
         <GitCompareArrows className="text-indigo-500" size={20} />
         <h3 className="text-lg font-black text-slate-800">Comparativo por Tipo de RM: RMT x RMC</h3>

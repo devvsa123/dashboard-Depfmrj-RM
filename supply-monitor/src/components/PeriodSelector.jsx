@@ -31,7 +31,7 @@ const PeriodSelector = ({
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 break-inside-avoid">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Calendar size={16} className="text-indigo-500" />

@@ -25,7 +25,7 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
     : [];
 
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 break-inside-avoid">
       <StcGtcPendingModal pendingType={pendingType} setPendingType={setPendingType} pendingOrders={pendingOrders} handleDownloadExcel={handleDownloadExcel} />
 
       <div className="flex items-center gap-2 mb-6">
