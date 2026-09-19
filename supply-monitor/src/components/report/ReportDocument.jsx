@@ -418,14 +418,18 @@ const ReportDocument = ({
             style={{ marginBottom: 10 }}
           />
           {interfaceAnalysis?.arrecadadoOmsSummary?.monthly?.length > 0 && (
-            <ChartFrame caption="Pedidos arrecadados pela OMS, por mês" height={150}>
-              <BarChart data={interfaceAnalysis.arrecadadoOmsSummary.monthly}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 9, fontWeight: 700 }} axisLine={false} />
-                <YAxis tick={{ fontSize: 9 }} axisLine={false} allowDecimals={false} />
-                <Bar dataKey="count" fill="#10b981" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-              </BarChart>
-            </ChartFrame>
+            <>
+              <ChartFrame caption="STC e GTC arrecadados pela OMS, por mês" height={150}>
+                <BarChart data={interfaceAnalysis.arrecadadoOmsSummary.monthly}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" tick={{ fontSize: 9, fontWeight: 700 }} axisLine={false} />
+                  <YAxis tick={{ fontSize: 9 }} axisLine={false} allowDecimals={false} />
+                  <Bar dataKey="stc" fill={TYPE_COLOR.STC} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="gtc" fill={TYPE_COLOR.GTC} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ChartFrame>
+              <StaticLegend items={[{ color: TYPE_COLOR.STC, label: 'STC' }, { color: TYPE_COLOR.GTC, label: 'GTC' }]} />
+            </>
           )}
 
           <div style={{ marginTop: 28 }}>

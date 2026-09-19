@@ -35,19 +35,23 @@ const summarizeByDocument = (items) => {
   };
 };
 
-// Agrupa uma lista de pedidos por mês de entrada, para uma visão de
-// tendência mensal (ex: quantos pedidos foram arrecadados pela OMS a cada mês).
-const monthlyCountOf = (items) => {
+// Agrupa uma lista de pedidos por mês de entrada, contando STC e GTC
+// distintos em cada mês (mesma noção de "documento" do cartão de STC/GTC —
+// um documento agrupa vários pedidos, então não dá pra simplesmente somar
+// linhas da planilha).
+const monthlyDocumentCountOf = (items) => {
   const months = {};
   items.forEach(item => {
     const entryStr = safeGetISODate(item.DATA_ENTRADA);
     if (!entryStr) return;
     const key = entryStr.substring(0, 7);
-    months[key] = (months[key] || 0) + 1;
+    if (!months[key]) months[key] = { stc: new Set(), gtc: new Set() };
+    const type = classifyStc(item.STC);
+    if (type) months[key][type === 'STC' ? 'stc' : 'gtc'].add(String(item.STC).trim().toUpperCase());
   });
   return Object.entries(months)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, count]) => ({ month, count }));
+    .map(([month, sets]) => ({ month, stc: sets.stc.size, gtc: sets.gtc.size }));
 };
 
 // Cruza os status lógicos entre WMS e SINGRA para achar descasamentos,
@@ -55,9 +59,12 @@ const monthlyCountOf = (items) => {
 export const useInterfaceAnalysis = (data, singraData) => {
   const [selectedErrorFilter, setSelectedErrorFilter] = useState(null);
 
+  // Padrão de 12 meses: "Arrecadado pela OMS" é pensado como uma visão de
+  // tendência mensal, não de recorte recente — 30 dias só mostrava o mês
+  // corrente no gráfico.
   const [interfaceStartDate, setInterfaceStartDate] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
+    d.setMonth(d.getMonth() - 12);
     return d.toISOString().split('T')[0];
   });
   const [interfaceEndDate, setInterfaceEndDate] = useState(() => {
@@ -182,7 +189,7 @@ export const useInterfaceAnalysis = (data, singraData) => {
       ...results,
       aguardandoRetiradaSummary: summarizeByDocument(results.aguardandoRetirada),
       aguardandoArrecadacaoSummary: summarizeByDocument(results.aguardandoArrecadacao),
-      arrecadadoOmsSummary: { ...summarizeByDocument(results.arrecadadoOms), monthly: monthlyCountOf(results.arrecadadoOms) }
+      arrecadadoOmsSummary: { ...summarizeByDocument(results.arrecadadoOms), monthly: monthlyDocumentCountOf(results.arrecadadoOms) }
     };
   }, [data, singraData, interfaceStartDate, interfaceEndDate]);
 

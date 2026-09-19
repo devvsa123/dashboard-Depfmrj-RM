@@ -1,11 +1,32 @@
 import { useState } from 'react';
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Clock, TrendingUp, CheckCircle2, FileStack } from 'lucide-react';
+import { Clock, TrendingUp, CheckCircle2, FileStack, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react';
 import InfoButton from './InfoButton';
 import StcGtcDocumentsModal from './StcGtcDocumentsModal';
 
 const TYPE_LABEL = { STC: 'STC', GTC: 'GTC' };
 const TYPE_COLOR = { STC: '#6366f1', GTC: '#f59e0b' };
+
+// Seta simples ao lado da média de dias: subindo (pior, mais dias) em
+// vermelho, estável em cinza escuro, caindo (melhor, menos dias) em verde.
+// Vem de uma regressão linear simples sobre a tendência mensal (ver
+// useStcGtcAnalysis) — de propósito, não é um teste estatístico robusto.
+const TREND_META = {
+  up: { Icon: ArrowUp, color: '#dc2626', label: 'Subindo' },
+  down: { Icon: ArrowDown, color: '#059669', label: 'Caindo' },
+  flat: { Icon: ArrowRight, color: '#334155', label: 'Estável' }
+};
+
+const TrendArrow = ({ trend }) => {
+  const meta = TREND_META[trend];
+  if (!meta) return null;
+  const { Icon, color, label } = meta;
+  return (
+    <span title={`Tendência (regressão linear simples sobre a média mensal): ${label}`}>
+      <Icon size={16} strokeWidth={3} style={{ color }} />
+    </span>
+  );
+};
 
 // Tempo total do processo (liberação -> expedição) por pedido, sua
 // tendência mês a mês, e a situação dos DOCUMENTOS STC/GTC — um mesmo
@@ -40,7 +61,10 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
               <div className="grid grid-cols-2 gap-4">
                 {groups.map(g => (
                   <div key={g.type} className="p-4 rounded-2xl border border-slate-100 bg-slate-50">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: TYPE_COLOR[g.type] }}>{TYPE_LABEL[g.type]}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: TYPE_COLOR[g.type] }}>{TYPE_LABEL[g.type]}</p>
+                      <TrendArrow trend={g.trend} />
+                    </div>
                     <p className="text-2xl font-black text-slate-800">{g.pedidoCount > 0 ? g.avgDays : '-'} <span className="text-xs text-slate-400 font-bold">dias (média)</span></p>
                     <p className="text-xs text-slate-400 font-medium mt-1">Mediana: {g.pedidoCount > 0 ? g.medianDays : '-'} dias</p>
                     <p className="text-xs text-slate-500 font-bold mt-2 pt-2 border-t border-slate-200">{g.documentCount} documento{g.documentCount === 1 ? '' : 's'} · {g.pedidoCount} pedido{g.pedidoCount === 1 ? '' : 's'}</p>

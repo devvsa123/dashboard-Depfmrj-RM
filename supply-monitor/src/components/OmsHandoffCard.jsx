@@ -1,6 +1,10 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { PackageCheck, Truck, Warehouse } from 'lucide-react';
 import InfoButton from './InfoButton';
+
+// Mesmas cores usadas no cartão de STC/GTC, pra manter a leitura visual
+// consistente entre os dois lugares onde STC/GTC aparecem lado a lado.
+const TYPE_COLOR = { stc: '#6366f1', gtc: '#f59e0b' };
 
 // Um pedido expedido pelo WMS ainda passa por duas etapas fora do WMS antes
 // de estar 100% resolvido: alguém precisa retirar o material fisicamente, e
@@ -63,7 +67,7 @@ const OmsHandoffCard = ({ interfaceAnalysis, interfaceStartDate, setInterfaceSta
           <div className="flex items-center gap-2">
             <PackageCheck size={16} className="text-emerald-500" />
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Arrecadado pela OMS (Finalizados)</p>
-            <InfoButton title="Arrecadado pela OMS" description="Pedidos expedidos pelo WMS e já arrecadados pela OMS — o ciclo está 100% concluído nos dois sistemas. Como o histórico completo é muito extenso, esta contagem é filtrada por data de entrada." />
+            <InfoButton title="Arrecadado pela OMS" description="Pedidos expedidos pelo WMS e já arrecadados pela OMS — o ciclo está 100% concluído nos dois sistemas. Como o histórico completo é muito extenso, esta contagem é filtrada por data de entrada (padrão: últimos 12 meses). O gráfico mostra os STC e GTC distintos arrecadados em cada mês." />
           </div>
           <div className="flex items-center gap-2">
             <input type="date" value={interfaceStartDate} onChange={e => setInterfaceStartDate(e.target.value)} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold shadow-sm" />
@@ -87,8 +91,10 @@ const OmsHandoffCard = ({ interfaceAnalysis, interfaceStartDate, setInterfaceSta
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 700 }} axisLine={false} />
                   <YAxis tick={{ fontSize: 10 }} axisLine={false} allowDecimals={false} />
-                  <Tooltip formatter={(v) => [`${v} pedido(s)`, 'Arrecadado']} />
-                  <Bar dataKey="count" name="Arrecadado pela OMS" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Tooltip formatter={(v, name) => [`${v} documento(s)`, name]} />
+                  <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: '11px' }} />
+                  <Bar dataKey="stc" name="STC" fill={TYPE_COLOR.stc} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="gtc" name="GTC" fill={TYPE_COLOR.gtc} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -21,6 +21,30 @@ const median = (arr) => {
 const TYPES = ["STC", "GTC"];
 const META_SLA_DIAS = 20;
 
+// Tendência linear simples (mínimos quadrados) sobre a série mensal de
+// tempo médio de processo — vira a seta ao lado da média (subindo/caindo/
+// estável). Uma variação total, ao longo de toda a série, menor que 5% da
+// média conta como estável — pedido explícito é "simples e rápido", não um
+// teste estatístico de significância.
+const TREND_STABLE_THRESHOLD = 0.05;
+const linearTrendDirection = (points) => {
+  if (points.length < 2) return null;
+  const n = points.length;
+  const sumX = points.reduce((acc, p) => acc + p.x, 0);
+  const sumY = points.reduce((acc, p) => acc + p.y, 0);
+  const sumXY = points.reduce((acc, p) => acc + p.x * p.y, 0);
+  const sumXX = points.reduce((acc, p) => acc + p.x * p.x, 0);
+  const denom = n * sumXX - sumX * sumX;
+  if (denom === 0) return 'flat';
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  const meanY = sumY / n;
+  if (meanY === 0) return 'flat';
+  const totalChangeRatio = (slope * (n - 1)) / meanY;
+  if (totalChangeRatio > TREND_STABLE_THRESHOLD) return 'up';
+  if (totalChangeRatio < -TREND_STABLE_THRESHOLD) return 'down';
+  return 'flat';
+};
+
 const AGING_BUCKET_DEFS = [
   { name: '0-7 dias', min: 0, max: 7 },
   { name: '8-15 dias', min: 8, max: 15 },
@@ -214,8 +238,15 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
         GTC_count: byType.GTC.length
       }));
 
+    const groupsWithTrend = groups.map(g => {
+      const points = monthlyTrend
+        .map((m, idx) => ({ x: idx, y: m[`${g.type}_avg`] }))
+        .filter(p => p.y !== null && p.y !== undefined);
+      return { ...g, trend: linearTrendDirection(points) };
+    });
+
     return {
-      groups,
+      groups: groupsWithTrend,
       monthlyTrend,
       documents,
       pendingOrders,
