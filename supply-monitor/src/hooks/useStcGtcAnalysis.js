@@ -19,7 +19,15 @@ const median = (arr) => {
 };
 
 const TYPES = ["STC", "GTC"];
-const META_SLA_DIAS = 20;
+
+// GTC é entrega em local próximo — a expedição depende só do depósito, por
+// isso o prazo é apertado (10 dias). STC vai para outro estado via outra
+// OM: hoje não temos a data em que a STC é de fato inserida no pedido (só
+// vemos o pedido "virar" STC olhando o histórico de status), então a
+// responsabilidade do depósito termina antes da expedição registrada no
+// sistema — o prazo de 45 dias é mais largo para compensar esse tempo que
+// não conseguimos medir separadamente.
+export const META_SLA_DIAS_POR_TIPO = { STC: 45, GTC: 10 };
 
 // Tendência linear simples (mínimos quadrados) sobre a série mensal de
 // tempo médio de processo — vira a seta ao lado da média (subindo/caindo/
@@ -200,7 +208,7 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
 
       leadTimesByType[type].push(diffDays);
       documentsSeenByType[type].add(String(item.STC).trim().toUpperCase());
-      if (diffDays <= META_SLA_DIAS) onTimeCountByType[type]++;
+      if (diffDays <= META_SLA_DIAS_POR_TIPO[type]) onTimeCountByType[type]++;
 
       const monthKey = sepStr.substring(0, 7);
       if (!monthlyByType[monthKey]) monthlyByType[monthKey] = { STC: [], GTC: [] };
@@ -215,7 +223,8 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
         documentCount: documentsSeenByType[type].size,
         avgDays: parseFloat(average(times).toFixed(1)),
         medianDays: parseFloat(median(times).toFixed(1)),
-        onTimeRate: times.length > 0 ? parseFloat(((onTimeCountByType[type] / times.length) * 100).toFixed(1)) : null
+        onTimeRate: times.length > 0 ? parseFloat(((onTimeCountByType[type] / times.length) * 100).toFixed(1)) : null,
+        metaSlaDias: META_SLA_DIAS_POR_TIPO[type]
       };
     });
 

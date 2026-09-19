@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react';
 import { safeGetISODate } from '../utils/dates';
-import { classifyStc } from './useStcGtcAnalysis';
+import { classifyStc, META_SLA_DIAS_POR_TIPO } from './useStcGtcAnalysis';
 
-const META_SLA_DIAS = 20;
+// GTC (entrega local) tem prazo de 10 dias, STC (outro estado, via outra
+// OM) tem 45 — mesma meta usada no cartão "Tempo Total do Processo: STC x
+// GTC". Pedidos sem STC nem GTC atribuído (raro; normalmente é questão de
+// tempo até um dos dois ser lançado) usam um meio-termo neutro de 20 dias.
+const META_SLA_DIAS_SEM_DOCUMENTO = 20;
+const metaSlaDiasDoPedido = (item) => META_SLA_DIAS_POR_TIPO[classifyStc(item.STC)] ?? META_SLA_DIAS_SEM_DOCUMENTO;
 
 // Análise por CAM (o recebedor/cliente de cada pedido): volume, tempo
 // médio de atendimento, nível de serviço e fila em aberto, tudo agrupado
@@ -68,7 +73,7 @@ export const useCamAnalysis = (data, chartData, visibleRange) => {
             const diffDays = Math.ceil((sepDate - new Date(entryStr)) / (1000 * 60 * 60 * 24));
             if (diffDays >= 0) {
               bucket.leadTimes.push(diffDays);
-              if (diffDays <= META_SLA_DIAS) bucket.onTime++;
+              if (diffDays <= metaSlaDiasDoPedido(item)) bucket.onTime++;
             }
           }
         }

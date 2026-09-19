@@ -38,7 +38,7 @@ const CamAnalysisCard = ({ rows, search, setSearch, sortKey, sortDir, toggleSort
           <h3 className="text-lg font-black text-slate-800">Análise por CAM</h3>
           <InfoButton
             title="Análise por CAM"
-            description="Entradas, expedidos, tempo médio, SLA, STC, GTC e Cancelados seguem o período selecionado mais acima. Fila em aberto (pendentes, idade média, mais antigo) é a situação atual, independente do período. Clique num cabeçalho para ordenar, ou numa linha para ver o detalhamento dos pedidos em aberto daquele CAM."
+            description="Entradas, expedidos, tempo médio, SLA, STC, GTC e Cancelados seguem o período selecionado mais acima. Fila em aberto (pendentes, idade média, mais antigo) é a situação atual, independente do período. O SLA usa a meta de prazo do documento de cada pedido — GTC: 10 dias, STC: 45 dias — e 20 dias para pedidos ainda sem STC/GTC atribuído. Clique num cabeçalho para ordenar, ou numa linha para ver o detalhamento dos pedidos em aberto daquele CAM."
           />
         </div>
         <div className="relative">

@@ -47,7 +47,7 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
         <h3 className="text-lg font-black text-slate-800">Tempo Total do Processo: STC x GTC</h3>
         <InfoButton
           title="Liberação até Expedição"
-          description="Tempo total (em dias corridos) desde a entrada até a expedição de pedidos finalizados, separado entre RMs identificadas por STC (ex: 003/2026) e por GTC (ex: GTC 002/2026). RMs sem nenhum dos dois não entram nesta análise — a fila geral está na aba 'RM em processamento'."
+          description="Tempo total (em dias corridos) desde a entrada até a expedição de pedidos finalizados, separado entre RMs identificadas por STC (ex: 003/2026) e por GTC (ex: GTC 002/2026). RMs sem nenhum dos dois não entram nesta análise — a fila geral está na aba 'RM em processamento'. Metas de prazo diferentes por tipo: GTC é entrega local, responsabilidade só do depósito (10 dias); STC vai para outro estado via outra OM, e como não temos a data exata em que a STC é inserida no pedido, o prazo é mais largo (45 dias) para compensar essa etapa que ainda não conseguimos medir separadamente."
         />
       </div>
 
@@ -68,7 +68,7 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
                     <p className="text-2xl font-black text-slate-800">{g.pedidoCount > 0 ? g.avgDays : '-'} <span className="text-xs text-slate-400 font-bold">dias (média)</span></p>
                     <p className="text-xs text-slate-400 font-medium mt-1">Mediana: {g.pedidoCount > 0 ? g.medianDays : '-'} dias</p>
                     <p className="text-xs text-slate-500 font-bold mt-2 pt-2 border-t border-slate-200">{g.documentCount} documento{g.documentCount === 1 ? '' : 's'} · {g.pedidoCount} pedido{g.pedidoCount === 1 ? '' : 's'}</p>
-                    {g.onTimeRate != null && <p className="text-xs text-slate-400 font-medium">{g.onTimeRate}% expedidos dentro do prazo</p>}
+                    {g.onTimeRate != null && <p className="text-xs text-slate-400 font-medium">{g.onTimeRate}% expedidos em até {g.metaSlaDias} dias</p>}
                   </div>
                 ))}
               </div>
