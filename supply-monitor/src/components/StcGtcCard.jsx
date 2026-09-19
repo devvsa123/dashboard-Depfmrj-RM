@@ -97,7 +97,7 @@ const StcGtcCard = ({ stcGtcAnalysis, handleDownloadExcel }) => {
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp size={14} className="text-slate-400" />
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tendência Histórica (Média Mensal)</p>
-                <InfoButton title="Tendência Histórica" description="Média de dias de processo por mês de expedição, dentro do período selecionado no dashboard. Ajuda a ver se o tempo de atendimento está melhorando ou piorando ao longo do tempo, e não só no recorte atual." />
+                <InfoButton title="Tendência Histórica" description="Média de dias de processo por mês de expedição, nos últimos 12 meses — independente do período selecionado mais acima. Ajuda a ver se o tempo de atendimento está melhorando ou piorando ao longo do tempo, e não só no recorte atual." />
               </div>
               <div className="h-[220px] w-full">
                 <ResponsiveContainer width="100%" height="100%">

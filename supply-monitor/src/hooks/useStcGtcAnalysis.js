@@ -190,6 +190,14 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
     const onTimeCountByType = { STC: 0, GTC: 0 };
     const monthlyByType = {}; // { 'YYYY-MM': { STC: [dias...], GTC: [dias...] } }
 
+    // Últimos 12 meses corridos a partir de hoje — a Tendência Histórica é
+    // uma visão "ao longo do tempo" por natureza (é o próprio motivo dela
+    // existir), então não deve ficar refém do período selecionado no
+    // dashboard (que pode ser um recorte de poucos dias). Mesma convenção
+    // usada no gráfico mensal da OMS.
+    const trendCutoffDate = new Date();
+    trendCutoffDate.setMonth(trendCutoffDate.getMonth() - 12);
+
     data.forEach(item => {
       if (statusOf(item) !== "EXPEDIDO") return;
 
@@ -201,18 +209,20 @@ export const useStcGtcAnalysis = (data, chartData, visibleRange) => {
       if (!entryStr || !sepStr) return;
 
       const sepDate = new Date(sepStr);
-      if (sepDate < startDate || sepDate > endDate) return;
-
       const diffDays = Math.ceil((sepDate - new Date(entryStr)) / (1000 * 60 * 60 * 24));
       if (diffDays < 0) return;
+
+      if (sepDate >= trendCutoffDate) {
+        const monthKey = sepStr.substring(0, 7);
+        if (!monthlyByType[monthKey]) monthlyByType[monthKey] = { STC: [], GTC: [] };
+        monthlyByType[monthKey][type].push(diffDays);
+      }
+
+      if (sepDate < startDate || sepDate > endDate) return;
 
       leadTimesByType[type].push(diffDays);
       documentsSeenByType[type].add(String(item.STC).trim().toUpperCase());
       if (diffDays <= META_SLA_DIAS_POR_TIPO[type]) onTimeCountByType[type]++;
-
-      const monthKey = sepStr.substring(0, 7);
-      if (!monthlyByType[monthKey]) monthlyByType[monthKey] = { STC: [], GTC: [] };
-      monthlyByType[monthKey][type].push(diffDays);
     });
 
     const groups = TYPES.map(type => {
