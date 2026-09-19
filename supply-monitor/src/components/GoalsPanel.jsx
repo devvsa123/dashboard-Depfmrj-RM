@@ -52,15 +52,13 @@ const DOC_GROUPS = [
 
 // Metas gerenciais editáveis + barras de progresso mostrando se a operação
 // está dentro do combinado (SLA, idade da fila, pedido mais antigo).
-const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, stcGtcAnalysis, pendingOrders, handleDownloadExcel }) => {
+const GoalsPanel = ({ goals, updateGoals, avgAge, stcGtcAnalysis, pendingOrders, handleDownloadExcel }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(goals);
   const [oldestSelection, setOldestSelection] = useState(null);
 
   const stcGroup = stcGtcAnalysis?.groups?.find(g => g.type === 'STC');
   const gtcGroup = stcGtcAnalysis?.groups?.find(g => g.type === 'GTC');
-  const stcDoc = stcGtcAnalysis?.documents?.find(d => d.type === 'STC');
-  const gtcDoc = stcGtcAnalysis?.documents?.find(d => d.type === 'GTC');
 
   // Idade máxima aceitável é diferente por tipo de documento (ver
   // useStcGtcAnalysis: STC vai para outro estado via outra OM, GTC é
@@ -84,12 +82,10 @@ const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, stcGtcAnalysis, pend
   const startEditing = () => { setDraft(goals); setIsEditing(true); };
   const saveEditing = () => {
     updateGoals({
-      slaTarget: Number(draft.slaTarget) || goals.slaTarget,
       maxBacklogAge: Number(draft.maxBacklogAge) || goals.maxBacklogAge,
       maxOldestOrder: Number(draft.maxOldestOrder) || goals.maxOldestOrder,
       stcSlaTarget: Number(draft.stcSlaTarget) || goals.stcSlaTarget,
       gtcSlaTarget: Number(draft.gtcSlaTarget) || goals.gtcSlaTarget,
-      docCompletionTarget: Number(draft.docCompletionTarget) || goals.docCompletionTarget,
       oldestStcTarget: Number(draft.oldestStcTarget) || goals.oldestStcTarget,
       oldestGtcTarget: Number(draft.oldestGtcTarget) || goals.oldestGtcTarget,
       oldestNoDocTarget: Number(draft.oldestNoDocTarget) || goals.oldestNoDocTarget
@@ -123,11 +119,7 @@ const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, stcGtcAnalysis, pend
 
       {isEditing ? (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <label className="block">
-              <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">Meta de Nível de Serviço (%)</span>
-              <input type="number" value={draft.slaTarget} onChange={e => setDraft(d => ({ ...d, slaTarget: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
-            </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block">
               <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">Idade média da fila (dias)</span>
               <input type="number" value={draft.maxBacklogAge} onChange={e => setDraft(d => ({ ...d, maxBacklogAge: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
@@ -138,8 +130,8 @@ const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, stcGtcAnalysis, pend
             </label>
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Metas por Tipo de Documento (STC/GTC)</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Metas de SLA por Tipo de Documento (STC/GTC)</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
                 <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">Meta de SLA — STC (%)</span>
                 <input type="number" value={draft.stcSlaTarget} onChange={e => setDraft(d => ({ ...d, stcSlaTarget: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
@@ -147,10 +139,6 @@ const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, stcGtcAnalysis, pend
               <label className="block">
                 <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">Meta de SLA — GTC (%)</span>
                 <input type="number" value={draft.gtcSlaTarget} onChange={e => setDraft(d => ({ ...d, gtcSlaTarget: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
-              </label>
-              <label className="block">
-                <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">Conclusão mínima de documentos (%)</span>
-                <input type="number" value={draft.docCompletionTarget} onChange={e => setDraft(d => ({ ...d, docCompletionTarget: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
               </label>
             </div>
           </div>
@@ -174,18 +162,15 @@ const GoalsPanel = ({ goals, updateGoals, slaAtual, avgAge, stcGtcAnalysis, pend
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <GoalMeter label="Nível de Serviço" value={slaAtual} target={goals.slaTarget} unit="%" higherIsBetter />
+          <div className="grid grid-cols-1 gap-6">
             <GoalMeter label="Idade Média da Fila" value={avgAge} target={goals.maxBacklogAge} unit="d" higherIsBetter={false} />
           </div>
           {stcGtcAnalysis && (
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Metas por Tipo de Documento (STC/GTC)</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">SLA por Tipo de Documento (STC/GTC)</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <GoalMeter label={`SLA — STC (até ${stcGroup?.metaSlaDias ?? '—'}d)`} value={stcGroup?.onTimeRate ?? null} target={goals.stcSlaTarget} unit="%" higherIsBetter />
                 <GoalMeter label={`SLA — GTC (até ${gtcGroup?.metaSlaDias ?? '—'}d)`} value={gtcGroup?.onTimeRate ?? null} target={goals.gtcSlaTarget} unit="%" higherIsBetter />
-                <GoalMeter label="Conclusão — STC" value={stcDoc?.completionRate ?? null} target={goals.docCompletionTarget} unit="%" higherIsBetter />
-                <GoalMeter label="Conclusão — GTC" value={gtcDoc?.completionRate ?? null} target={goals.docCompletionTarget} unit="%" higherIsBetter />
               </div>
             </div>
           )}

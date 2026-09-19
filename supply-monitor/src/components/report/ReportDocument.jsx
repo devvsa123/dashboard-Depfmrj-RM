@@ -159,7 +159,6 @@ const ReportDocument = ({
   const stcGroup = stcGtcAnalysis?.groups?.find(g => g.type === 'STC');
   const gtcGroup = stcGtcAnalysis?.groups?.find(g => g.type === 'GTC');
   const stcDoc = stcGtcAnalysis?.documents?.find(d => d.type === 'STC');
-  const gtcDoc = stcGtcAnalysis?.documents?.find(d => d.type === 'GTC');
   const healthLabel = health === 'critical' ? 'Crítica' : health === 'warning' ? 'Requer Atenção' : 'Saudável';
   const topCams = camAnalysis?.rows?.length
     ? [...camAnalysis.rows].sort((a, b) => b.entradas - a.entradas).slice(0, 12)
@@ -244,13 +243,10 @@ const ReportDocument = ({
         <div style={{ padding: '36px 32px 0' }}>
           <SectionHeading number={3} title="Metas e Progresso" description="Indicadores atuais comparados às metas definidas pela equipe." />
           <div style={{ marginBottom: 28 }}>
-            <GoalBar label="Nível de Serviço" value={Number(slaAnalysis?.taxaNoPrazo) || 0} target={goals.slaTarget} unit="%" higherIsBetter />
             <GoalBar label="Idade Média da Fila" value={Number(backlogAnalysis?.avgAge) || 0} target={goals.maxBacklogAge} unit="d" higherIsBetter={false} />
             <GoalBar label="Pedido Mais Antigo" value={backlogAnalysis?.oldestOrder?.daysOpen || 0} target={goals.maxOldestOrder} unit="d" higherIsBetter={false} />
-            <GoalBar label="SLA — STC" value={stcGroup?.onTimeRate ?? null} target={goals.stcSlaTarget} unit="%" higherIsBetter />
-            <GoalBar label="SLA — GTC" value={gtcGroup?.onTimeRate ?? null} target={goals.gtcSlaTarget} unit="%" higherIsBetter />
-            <GoalBar label="Conclusão de Documentos — STC" value={stcDoc?.completionRate ?? null} target={goals.docCompletionTarget} unit="%" higherIsBetter />
-            <GoalBar label="Conclusão de Documentos — GTC" value={gtcDoc?.completionRate ?? null} target={goals.docCompletionTarget} unit="%" higherIsBetter />
+            <GoalBar label={`SLA — STC (até ${stcGroup?.metaSlaDias ?? '—'}d)`} value={stcGroup?.onTimeRate ?? null} target={goals.stcSlaTarget} unit="%" higherIsBetter />
+            <GoalBar label={`SLA — GTC (até ${gtcGroup?.metaSlaDias ?? '—'}d)`} value={gtcGroup?.onTimeRate ?? null} target={goals.gtcSlaTarget} unit="%" higherIsBetter />
           </div>
 
           <SectionHeading number={4} title="Comparativo por Tipo de RM (RMT x RMC)" />

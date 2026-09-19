@@ -4,30 +4,35 @@ import { useMemo } from 'react';
 // dos mesmos números já exibidos no dashboard, comparados às metas do
 // usuário (useGoals). Nenhum limiar extra escondido: os limiares "críticos"
 // são sempre um múltiplo claro da própria meta.
-export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, slaAnalysis, selectionSummary, stcGtcAnalysis, goals }) => {
+export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, selectionSummary, stcGtcAnalysis, goals }) => {
   return useMemo(() => {
     const alerts = [];
 
-    const slaAtual = Number(slaAnalysis?.taxaNoPrazo) || 0;
-    if (slaAnalysis && backlogAnalysis) {
-      if (slaAtual < goals.slaTarget - 20) {
+    // SLA sempre por tipo de documento, nunca um "geral" misturando STC e
+    // GTC — os dois têm metas de prazo bem diferentes (ver
+    // useStcGtcAnalysis), então uma média única não diz muita coisa.
+    const SLA_GOAL_KEY = { STC: 'stcSlaTarget', GTC: 'gtcSlaTarget' };
+    stcGtcAnalysis?.groups?.forEach(g => {
+      if (g.onTimeRate == null) return;
+      const target = goals[SLA_GOAL_KEY[g.type]];
+      if (g.onTimeRate < target - 20) {
         alerts.push({
-          id: 'sla-critical',
+          id: `sla-critical-${g.type}`,
           severity: 'critical',
           tab: 'dashboard',
-          title: 'Nível de serviço muito abaixo da meta',
-          description: `SLA em ${slaAtual}% no período, contra meta de ${goals.slaTarget}%.`
+          title: `Nível de serviço de ${g.type} muito abaixo da meta`,
+          description: `SLA de ${g.type} em ${g.onTimeRate}% no período (prazo de até ${g.metaSlaDias} dias), contra meta de ${target}%.`
         });
-      } else if (slaAtual < goals.slaTarget) {
+      } else if (g.onTimeRate < target) {
         alerts.push({
-          id: 'sla-warning',
+          id: `sla-warning-${g.type}`,
           severity: 'warning',
           tab: 'dashboard',
-          title: 'Nível de serviço abaixo da meta',
-          description: `SLA em ${slaAtual}% no período, contra meta de ${goals.slaTarget}%.`
+          title: `Nível de serviço de ${g.type} abaixo da meta`,
+          description: `SLA de ${g.type} em ${g.onTimeRate}% no período (prazo de até ${g.metaSlaDias} dias), contra meta de ${target}%.`
         });
       }
-    }
+    });
 
     const avgAge = Number(backlogAnalysis?.avgAge) || 0;
     if (backlogAnalysis && backlogAnalysis.totalPending > 0) {
@@ -93,30 +98,6 @@ export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, slaAnalysis,
       });
     }
 
-    // Taxa de conclusão de documentos STC/GTC: quantos dos documentos (não
-    // dos pedidos) já foram 100% expedidos, comparado à meta do usuário.
-    stcGtcAnalysis?.documents?.forEach(doc => {
-      if (doc.completionRate == null) return;
-      const label = doc.type === 'STC' ? 'STC' : 'GTC';
-      if (doc.completionRate < goals.docCompletionTarget - 20) {
-        alerts.push({
-          id: `doc-completion-critical-${doc.type}`,
-          severity: 'critical',
-          tab: 'dashboard',
-          title: `Conclusão de ${label} muito abaixo da meta`,
-          description: `Apenas ${doc.completionRate}% dos documentos ${label} estão totalmente concluídos, contra meta de ${goals.docCompletionTarget}%.`
-        });
-      } else if (doc.completionRate < goals.docCompletionTarget) {
-        alerts.push({
-          id: `doc-completion-warning-${doc.type}`,
-          severity: 'warning',
-          tab: 'dashboard',
-          title: `Conclusão de ${label} abaixo da meta`,
-          description: `${doc.completionRate}% dos documentos ${label} estão totalmente concluídos, contra meta de ${goals.docCompletionTarget}%.`
-        });
-      }
-    });
-
     const severityRank = { critical: 2, warning: 1 };
     alerts.sort((a, b) => severityRank[b.severity] - severityRank[a.severity]);
 
@@ -127,5 +108,5 @@ export const useRiskAlerts = ({ backlogAnalysis, interfaceAnalysis, slaAnalysis,
         : 'good';
 
     return { alerts, health };
-  }, [backlogAnalysis, interfaceAnalysis, slaAnalysis, selectionSummary, stcGtcAnalysis, goals]);
+  }, [backlogAnalysis, interfaceAnalysis, selectionSummary, stcGtcAnalysis, goals]);
 };

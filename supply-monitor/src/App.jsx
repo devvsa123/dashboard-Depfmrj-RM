@@ -51,7 +51,6 @@ const App = () => {
   const riskAlerts = useRiskAlerts({
     backlogAnalysis: backlogAnalysis.backlogAnalysis,
     interfaceAnalysis: interfaceAnalysis.interfaceAnalysis,
-    slaAnalysis: dashboardAnalytics.slaAnalysis,
     selectionSummary: dashboardAnalytics.selectionSummary,
     stcGtcAnalysis,
     goals

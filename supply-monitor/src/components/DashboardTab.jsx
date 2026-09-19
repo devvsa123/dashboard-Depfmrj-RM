@@ -232,7 +232,6 @@ const DashboardTab = ({
         <GoalsPanel
           goals={goals}
           updateGoals={updateGoals}
-          slaAtual={Number(slaAnalysis?.taxaNoPrazo) || 0}
           avgAge={Number(backlogAnalysis?.avgAge) || 0}
           stcGtcAnalysis={stcGtcAnalysis}
           pendingOrders={backlogAnalysis?.pendingOrders}
