@@ -15,6 +15,7 @@ import GoalsPanel from './GoalsPanel';
 import StcGtcCard from './StcGtcCard';
 import RmTypeComparisonCard from './RmTypeComparisonCard';
 import OmsHandoffCard from './OmsHandoffCard';
+import CamAnalysisCard from './CamAnalysisCard';
 import DeltaBadge from './DeltaBadge';
 import SectionLabel from './SectionLabel';
 import YoySeasonalityCard from './YoySeasonalityCard';
@@ -63,7 +64,7 @@ const DashboardTab = ({
   selectedDateRange, activePresetKey, applyPreset, applyCustomRange,
   comparisonMode, setComparisonMode,
   selectedPiSegment, setSelectedPiSegment, data, handleDownloadExcel,
-  periodComparison, comparisonSeries, trendForecast, stcGtcAnalysis, rmTypeComparison, camAnalysis, interfaceAnalysis,
+  periodComparison, comparisonSeries, trendForecast, stcGtcAnalysis, rmTypeComparison, camAnalysis, camTable, interfaceAnalysis,
   interfaceStartDate, setInterfaceStartDate, interfaceEndDate, setInterfaceEndDate,
   health, alerts, onNavigate, goals, updateGoals,
   yoyAnalysis, selectedYoyYears, toggleYoyYear, yoyMetrics, setYoyMetrics
@@ -325,6 +326,18 @@ const DashboardTab = ({
         setInterfaceStartDate={setInterfaceStartDate}
         interfaceEndDate={interfaceEndDate}
         setInterfaceEndDate={setInterfaceEndDate}
+      />
+
+      <SectionLabel title="Análise por CAM" description="Volume, tempo de atendimento e fila em aberto agrupados por CAM (recebedor/cliente)" />
+
+      <CamAnalysisCard
+        rows={camTable.rows}
+        search={camTable.search}
+        setSearch={camTable.setSearch}
+        sortKey={camTable.sortKey}
+        sortDir={camTable.sortDir}
+        toggleSort={camTable.toggleSort}
+        handleDownloadExcel={handleDownloadExcel}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

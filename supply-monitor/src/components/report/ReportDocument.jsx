@@ -468,7 +468,7 @@ const ReportDocument = ({
           <SectionHeading
             number={10}
             title="Análise por CAM"
-            description={`Os ${topCams.length} CAMs de maior volume no período. Entradas/expedidos/SLA seguem o período do relatório; fila é a situação atual.`}
+            description={`Os ${topCams.length} CAMs de maior volume no período. Entradas, expedidos, SLA, STC, GTC e cancelados seguem o período do relatório; fila é a situação atual.`}
           />
           {topCams.length > 0 ? (
             <DataTable

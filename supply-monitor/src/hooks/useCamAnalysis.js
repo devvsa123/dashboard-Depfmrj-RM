@@ -28,7 +28,7 @@ export const useCamAnalysis = (data, chartData, visibleRange) => {
       if (!byCam.has(cam)) {
         byCam.set(cam, {
           cam, totalPedidos: 0, cancelados: 0, entradas: 0,
-          leadTimes: [], onTime: 0, pendentes: 0, pendentesAges: [],
+          leadTimes: [], onTime: 0, pendentes: 0, pendentesAges: [], openPedidos: [],
           stcSet: new Set(), gtcSet: new Set()
         });
       }
@@ -41,16 +41,22 @@ export const useCamAnalysis = (data, chartData, visibleRange) => {
       const status = String(item.STATUS || '').toUpperCase().trim();
       bucket.totalPedidos++;
 
-      const docType = classifyStc(item.STC);
-      if (docType === 'STC') bucket.stcSet.add(String(item.STC).trim().toUpperCase());
-      else if (docType === 'GTC') bucket.gtcSet.add(String(item.STC).trim().toUpperCase());
-
-      if (status === 'CANCELADO') { bucket.cancelados++; return; }
-
       const entryStr = safeGetISODate(item.DATA_ENTRADA);
-      if (entryStr && startDate && endDate) {
-        const entryDate = new Date(entryStr);
-        if (entryDate >= startDate && entryDate <= endDate) bucket.entradas++;
+      const entryInPeriod = Boolean(entryStr && startDate && endDate && new Date(entryStr) >= startDate && new Date(entryStr) <= endDate);
+
+      // Cancelados e STC/GTC agora seguem o mesmo período selecionado que
+      // Entradas — contam pedidos cuja DATA_ENTRADA caiu no período, e não
+      // mais o histórico completo do CAM.
+      if (status === 'CANCELADO') {
+        if (entryInPeriod) bucket.cancelados++;
+        return;
+      }
+
+      if (entryInPeriod) {
+        bucket.entradas++;
+        const docType = classifyStc(item.STC);
+        if (docType === 'STC') bucket.stcSet.add(String(item.STC).trim().toUpperCase());
+        else if (docType === 'GTC') bucket.gtcSet.add(String(item.STC).trim().toUpperCase());
       }
 
       if (status === 'EXPEDIDO') {
@@ -67,10 +73,14 @@ export const useCamAnalysis = (data, chartData, visibleRange) => {
           }
         }
       } else {
-        // Pendente: situação atual, não filtrada pelo período selecionado
+        // Em aberto: situação atual, não filtrada pelo período selecionado
         // (mesma lógica usada no restante do app para "fila em aberto").
+        // Guarda o pedido inteiro (não só a contagem) para o detalhamento
+        // por CAM: quantos já têm STC/GTC e a lista por status.
         bucket.pendentes++;
-        if (entryStr) bucket.pendentesAges.push(Math.floor((today - new Date(entryStr)) / (1000 * 60 * 60 * 24)));
+        const daysOpen = entryStr ? Math.floor((today - new Date(entryStr)) / (1000 * 60 * 60 * 24)) : null;
+        if (daysOpen !== null) bucket.pendentesAges.push(daysOpen);
+        bucket.openPedidos.push({ ...item, status, daysOpen });
       }
     });
 
@@ -86,7 +96,8 @@ export const useCamAnalysis = (data, chartData, visibleRange) => {
       avgAgePendentes: b.pendentesAges.length ? parseFloat((b.pendentesAges.reduce((a, c) => a + c, 0) / b.pendentesAges.length).toFixed(1)) : null,
       oldestPendente: b.pendentesAges.length ? Math.max(...b.pendentesAges) : null,
       stcCount: b.stcSet.size,
-      gtcCount: b.gtcSet.size
+      gtcCount: b.gtcSet.size,
+      openPedidos: b.openPedidos
     }));
 
     return { rows, hasData: rows.length > 0 };
