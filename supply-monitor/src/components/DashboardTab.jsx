@@ -234,8 +234,9 @@ const DashboardTab = ({
           updateGoals={updateGoals}
           slaAtual={Number(slaAnalysis?.taxaNoPrazo) || 0}
           avgAge={Number(backlogAnalysis?.avgAge) || 0}
-          oldest={backlogAnalysis?.oldestOrder?.daysOpen || 0}
           stcGtcAnalysis={stcGtcAnalysis}
+          pendingOrders={backlogAnalysis?.pendingOrders}
+          handleDownloadExcel={handleDownloadExcel}
         />
       </div>
 
