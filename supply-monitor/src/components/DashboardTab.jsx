@@ -99,6 +99,22 @@ const DashboardTab = ({
         data={data}
       />
 
+      {/* Controlador de período primeiro: praticamente tudo abaixo (KPIs,
+          riscos, metas, comparativo RMT x RMC, gráficos) é "do período
+          selecionado" — faz sentido escolher o período antes de ver esses
+          números, não depois. */}
+      <PeriodSelector
+        chartData={chartData}
+        visibleRange={visibleRange}
+        setVisibleRange={setVisibleRange}
+        selectedDateRange={selectedDateRange}
+        activePresetKey={activePresetKey}
+        applyPreset={applyPreset}
+        applyCustomRange={applyCustomRange}
+        comparisonMode={comparisonMode}
+        setComparisonMode={setComparisonMode}
+      />
+
       <MonthlyReportCard
         chartData={chartData}
         applyCustomRange={applyCustomRange}
@@ -224,19 +240,7 @@ const DashboardTab = ({
 
       <RmTypeComparisonCard rmTypeComparison={rmTypeComparison} />
 
-      <SectionLabel title="Tendências ao Longo do Tempo" description="Escolha um período pronto, um intervalo específico, ou ajuste manualmente pela barra" />
-
-      <PeriodSelector
-        chartData={chartData}
-        visibleRange={visibleRange}
-        setVisibleRange={setVisibleRange}
-        selectedDateRange={selectedDateRange}
-        activePresetKey={activePresetKey}
-        applyPreset={applyPreset}
-        applyCustomRange={applyCustomRange}
-        comparisonMode={comparisonMode}
-        setComparisonMode={setComparisonMode}
-      />
+      <SectionLabel title="Tendências ao Longo do Tempo" description="Ajuste o período mais acima para mudar o recorte destes gráficos" />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
