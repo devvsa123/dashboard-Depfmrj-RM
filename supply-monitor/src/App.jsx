@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  Upload, Loader2, Activity, Clock, LayoutDashboard, Hourglass,
-  RefreshCw, Network, Database, Search, AlertCircle, Package
+  Loader2, Activity, Clock, LayoutDashboard, Hourglass,
+  Network, Database, Search, AlertCircle, Package
 } from 'lucide-react';
 import { downloadExcel } from './utils/spreadsheet';
 import { useSpreadsheetSync } from './hooks/useSpreadsheetSync';
@@ -33,7 +33,7 @@ const App = () => {
   const [selectedPiSegment, setSelectedPiSegment] = useState(null);
   const [bucketSearchTerm, setBucketSearchTerm] = useState("");
 
-  const { data, singraData, fileName, loading, error, lastSync, performSync, handleFileUpload: syncFileUpload } = useSpreadsheetSync();
+  const { data, singraData, loading, error, lastSync } = useSpreadsheetSync();
 
   const emailExtractor = useEmailExtractor(data, singraData);
   const dashboardAnalytics = useDashboardAnalytics(data);
@@ -61,11 +61,6 @@ const App = () => {
     goals
   });
 
-  const handleFileUpload = (e) => {
-    ai.resetAiAnalysis();
-    syncFileUpload(e);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 overflow-x-hidden">
       <div className="w-full px-4 py-4 md:px-10 md:py-8 transition-all">
@@ -79,15 +74,6 @@ const App = () => {
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-3">
-                <button onClick={() => performSync(true)} disabled={loading} className="px-6 py-2.5 rounded-xl font-bold bg-indigo-600 text-white shadow-sm flex items-center gap-2 hover:bg-indigo-700 transition-all text-sm disabled:opacity-50 active:scale-95">
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />} Sincronizar Robôs
-                </button>
-                <label className="px-6 py-2.5 rounded-xl font-bold bg-white border border-slate-200 shadow-sm flex items-center gap-2 hover:border-indigo-500 hover:text-indigo-600 transition-all text-sm cursor-pointer active:scale-95">
-                  <Upload size={18} /> {fileName || "Enviar Planilha"}
-                  <input type="file" className="hidden" onChange={handleFileUpload} />
-                </label>
-              </div>
               <div className="flex items-center gap-2">
                 {data.length > 0 && <HealthBadge health={riskAlerts.health} />}
                 {lastSync && (
@@ -221,7 +207,7 @@ const App = () => {
                {loading ? <Loader2 size={60} className="text-indigo-500 animate-spin" /> : <Database size={60} className="text-indigo-500 opacity-20" />}
              </div>
              <h2 className="text-2xl font-black text-slate-800 tracking-tight">Supply Monitor Integrado</h2>
-             <p className="text-slate-400 text-sm mt-2 font-medium">Aguarde o carregamento ou clique em Sincronizar Robôs.</p>
+             <p className="text-slate-400 text-sm mt-2 font-medium">Carregando os dados mais recentes dos robôs.</p>
           </div>
         )}
       </div>

@@ -3,12 +3,11 @@ import { XLSX_SCRIPT_URL, WMS_URL, SINGRA_URL } from '../constants';
 import { saveToCache, getFromCache } from '../utils/cache';
 import { normalizeKeys, fetchSingraOnly } from '../utils/spreadsheet';
 
-// Carrega o WMS/SINGRA (nuvem, cache local ou upload manual) e mantém o
-// motor de planilhas (SheetJS) carregado no window.
+// Carrega o WMS/SINGRA da nuvem (ou do cache local, quando as planilhas
+// não mudaram) e mantém o motor de planilhas (SheetJS) carregado no window.
 export const useSpreadsheetSync = () => {
   const [data, setData] = useState([]);
   const [singraData, setSingraData] = useState([]);
-  const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [libLoaded, setLibLoaded] = useState(false);
@@ -45,7 +44,6 @@ export const useSpreadsheetSync = () => {
           setData(cachedData.wmsData);
           setSingraData(cachedData.singraData);
           setLastSync(cachedData.lastSync);
-          setFileName("Carregado Rápido (Cache)");
           setLoading(false);
           return;
         }
@@ -75,7 +73,6 @@ export const useSpreadsheetSync = () => {
       setData(normalizedWms);
       setSingraData(normalizedSingra);
       setLastSync(lastSyncTime);
-      setFileName("Sincronizado na Nuvem ☁️");
 
       await saveToCache('supplyData', {
         wmsMod,
@@ -104,44 +101,5 @@ export const useSpreadsheetSync = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [libLoaded]);
 
-  const handleFileUpload = useCallback(async (e) => {
-    const file = e.target.files[0];
-    if (!file || !libLoaded) return;
-
-    setLoading(true);
-    setError("");
-    setFileName(file.name);
-    // Usa a data real em que o arquivo foi modificado no computador
-    setLastSync(new Date(file.lastModified).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }));
-
-    const singra = await fetchSingraOnly();
-    setSingraData(singra);
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target.result;
-        const wb = window.XLSX.read(bstr, { type: 'binary', cellDates: true });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const jsonData = window.XLSX.utils.sheet_to_json(ws);
-
-        if (jsonData.length === 0) throw new Error("A planilha está vazia.");
-
-        const normalizedData = jsonData.map(normalizeKeys);
-        setData(normalizedData);
-      } catch (err) {
-        console.error(err);
-        setError("Erro ao processar o arquivo.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    reader.readAsBinaryString(file);
-  }, [libLoaded]);
-
-  return {
-    data, singraData, fileName, loading, error, lastSync,
-    performSync, handleFileUpload
-  };
+  return { data, singraData, loading, error, lastSync, performSync };
 };
