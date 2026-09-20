@@ -16,8 +16,15 @@ export const useAiConsultant = ({ chartData, selectionSummary, slaAnalysis, back
     setAiError("");
     setAiAnalysis("");
     try {
+      // O Vite embute as variáveis VITE_* no bundle na hora do BUILD, não
+      // em tempo de execução — então não basta cadastrar a chave na
+      // hospedagem: é preciso publicar de novo para ela entrar.
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("Chave da API Gemini não configurada (VITE_GEMINI_API_KEY).");
+      if (!apiKey) {
+        throw new Error(
+          'Chave da API Gemini não configurada. Cadastre VITE_GEMINI_API_KEY nas variáveis de ambiente da hospedagem (ou no arquivo .env, se estiver rodando local) e publique o site de novo — a chave entra no site no momento da publicação.'
+        );
+      }
 
       const totalEntradasHist = chartData.reduce((acc, curr) => acc + (curr.entradas || 0), 0);
       const totalSaidasHist = chartData.reduce((acc, curr) => acc + (curr.separacoes || 0), 0);
