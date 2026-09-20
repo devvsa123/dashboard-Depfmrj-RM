@@ -1,13 +1,6 @@
 import { useMemo, useState } from 'react';
 import { safeGetISODate } from '../utils/dates';
-import { classifyStc, META_SLA_DIAS_POR_TIPO } from './useStcGtcAnalysis';
-
-// GTC (entrega local) tem prazo de 10 dias, STC (outro estado, via outra
-// OM) tem 45 — mesma meta usada no cartão "Tempo Total do Processo: STC x
-// GTC". Pedidos sem STC nem GTC atribuído (raro; normalmente é questão de
-// tempo até um dos dois ser lançado) usam um meio-termo neutro de 20 dias.
-const META_SLA_DIAS_SEM_DOCUMENTO = 20;
-const metaSlaDiasDoPedido = (item) => META_SLA_DIAS_POR_TIPO[classifyStc(item.STC)] ?? META_SLA_DIAS_SEM_DOCUMENTO;
+import { classifyStc, metaSlaDiasDoPedido } from './useStcGtcAnalysis';
 
 // Análise por CAM (o recebedor/cliente de cada pedido): volume, tempo
 // médio de atendimento, nível de serviço e fila em aberto, tudo agrupado

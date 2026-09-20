@@ -29,6 +29,15 @@ const TYPES = ["STC", "GTC"];
 // não conseguimos medir separadamente.
 export const META_SLA_DIAS_POR_TIPO = { STC: 45, GTC: 10 };
 
+// Pedidos que ainda não têm STC nem GTC atribuído usam um meio-termo
+// neutro. Sempre que um indicador de SLA olhar pedidos misturados (por
+// CAM, por tipo de RM etc), ele deve usar esta função — assim o prazo
+// cobrado de cada pedido é o do documento dele, e o número bate com o SLA
+// por tipo de documento mostrado nas Metas.
+const META_SLA_DIAS_SEM_DOCUMENTO = 20;
+export const metaSlaDiasDoPedido = (item) =>
+  META_SLA_DIAS_POR_TIPO[classifyStc(item.STC)] ?? META_SLA_DIAS_SEM_DOCUMENTO;
+
 // Tendência linear simples (mínimos quadrados) sobre a série mensal de
 // tempo médio de processo — vira a seta ao lado da média (subindo/caindo/
 // estável). Uma variação total, ao longo de toda a série, menor que 5% da

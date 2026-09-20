@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { safeGetISODate } from '../utils/dates';
-
-const META_SLA_DIAS = 20;
+import { metaSlaDiasDoPedido } from './useStcGtcAnalysis';
 
 const shiftDays = (iso, days) => {
   const d = new Date(`${iso}T00:00:00`);
@@ -75,7 +74,9 @@ const computeSlaRate = (data, startDate, endDate) => {
       if (sepDate >= startDate && sepDate <= endDate) {
         expedidosTotal++;
         const diffDays = Math.ceil((sepDate - new Date(entryDateStr)) / (1000 * 60 * 60 * 24));
-        if (diffDays <= META_SLA_DIAS) expedidosNoPrazo++;
+        // Cada pedido é cobrado no prazo do documento dele (STC/GTC), o
+        // mesmo critério usado nas Metas e nos demais indicadores de SLA.
+        if (diffDays <= metaSlaDiasDoPedido(item)) expedidosNoPrazo++;
       }
     }
   });

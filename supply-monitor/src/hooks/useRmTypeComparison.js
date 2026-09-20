@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { safeGetISODate } from '../utils/dates';
+import { metaSlaDiasDoPedido } from './useStcGtcAnalysis';
 
-const META_SLA_DIAS = 20;
 const TYPES = ["RMT", "RMC"];
 
 const average = (arr) => arr.length ? parseFloat((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : null;
@@ -42,7 +42,9 @@ export const useRmTypeComparison = (data, chartData, visibleRange) => {
           if (diffDays < 0) return;
           expedidos++;
           leadTimes.push(diffDays);
-          if (diffDays <= META_SLA_DIAS) noPrazo++;
+          // Cada pedido é cobrado no prazo do documento dele (STC/GTC) —
+          // o mesmo critério do SLA por tipo de documento nas Metas.
+          if (diffDays <= metaSlaDiasDoPedido(item)) noPrazo++;
         }
       });
 
