@@ -190,6 +190,7 @@ const App = () => {
             <ItemAnalysisTab
               rows={itemAnalysis.rows}
               summary={itemAnalysis.summary}
+              cancelamento={itemAnalysis.cancelamento}
               nivel={itemAnalysis.nivel}
               setNivel={itemAnalysis.setNivel}
               search={itemAnalysis.search}

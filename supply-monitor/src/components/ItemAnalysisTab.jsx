@@ -3,6 +3,7 @@ import { Package, Search, ArrowUpDown, ChevronUp, ChevronDown, Layers, Hourglass
 import InfoButton from './InfoButton';
 import SectionLabel from './SectionLabel';
 import ItemDetailsModal from './ItemDetailsModal';
+import CancelamentoPanel from './CancelamentoPanel';
 import { NIVEIS } from '../hooks/useItemAnalysis';
 
 const COLUMNS = [
@@ -12,6 +13,8 @@ const COLUMNS = [
   { key: 'participacao', label: '% Volume', align: 'right', suffix: '%' },
   { key: 'acumuladoPct', label: '% Acum.', align: 'right', suffix: '%' },
   { key: 'expedidos', label: 'Expedidos', align: 'right' },
+  { key: 'cancelados', label: 'Cancel.', align: 'right' },
+  { key: 'taxaCancelamento', label: '% Cancel.', align: 'right', suffix: '%' },
   { key: 'avgLeadTime', label: 'Tempo Médio', align: 'right', suffix: 'd' },
   { key: 'slaRate', label: 'SLA', align: 'right', suffix: '%' },
   { key: 'pendentes', label: 'Fila Atual', align: 'right' },
@@ -46,7 +49,7 @@ const SummaryTile = (props) => {
 // pela curva ABC, que mostra os poucos grupos responsáveis pela maior
 // parte do movimento. Clicar num grupo abre do que ele é feito e a fila
 // em aberto por status.
-const ItemAnalysisTab = ({ rows, summary, nivel, setNivel, search, setSearch, sortKey, sortDir, toggleSort, nivelFilhoLabel, handleDownloadExcel }) => {
+const ItemAnalysisTab = ({ rows, summary, cancelamento, nivel, setNivel, search, setSearch, sortKey, sortDir, toggleSort, nivelFilhoLabel, handleDownloadExcel }) => {
   const [selection, setSelection] = useState(null);
   const nivelAtual = NIVEIS.find(n => n.key === nivel);
 
@@ -93,6 +96,8 @@ const ItemAnalysisTab = ({ rows, summary, nivel, setNivel, search, setSearch, so
         <p className="text-sm text-slate-400 italic text-center py-10 bg-white rounded-3xl border border-slate-200">Sem dados de item disponíveis.</p>
       )}
 
+      <CancelamentoPanel cancelamento={cancelamento} handleDownloadExcel={handleDownloadExcel} />
+
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -101,7 +106,7 @@ const ItemAnalysisTab = ({ rows, summary, nivel, setNivel, search, setSearch, so
               <h3 className="text-lg font-black text-slate-800">Detalhamento por Item</h3>
               <InfoButton
                 title="Como os itens são agrupados"
-                description="A nomenclatura do WMS segue o padrão peça + atributos + tamanho. Família é a peça (CALCA, SAPATO...); Linha é o modelo sem a peça, o que junta a calça, a gandola e o gorro do mesmo conjunto; Grade é o item com todos os tamanhos somados. A classe ABC ordena por volume: A são os grupos que somam até 80% das entradas, B até 95%, C o restante. Entradas, expedidos, tempo médio, SLA e a classe ABC seguem o período selecionado na aba Indicadores; fila e mais antigo são a situação atual. Clique numa linha para ver a composição do grupo e os pedidos em aberto."
+                description="A nomenclatura do WMS segue o padrão peça + atributos + tamanho. Família é a peça (CALCA, SAPATO...); Linha é o modelo sem a peça, o que junta a calça, a gandola e o gorro do mesmo conjunto; Grade é o item com todos os tamanhos somados. A classe ABC ordena por volume: A são os grupos que somam até 80% das entradas, B até 95%, C o restante. Entradas, expedidos, tempo médio, SLA e a classe ABC seguem o período selecionado na aba Indicadores; fila e mais antigo são a situação atual. As colunas Cancel. e % Cancel. mostram os pedidos do grupo que foram cancelados no período e o quanto isso representa da demanda dele. Clique numa linha para ver a composição do grupo, os pedidos em aberto e os cancelados."
               />
             </div>
             <div className="relative">
@@ -162,6 +167,8 @@ const ItemAnalysisTab = ({ rows, summary, nivel, setNivel, search, setSearch, so
                   <td className="px-4 py-3 text-right font-medium">{fmt(r.participacao, '%')}</td>
                   <td className="px-4 py-3 text-right font-medium text-slate-400">{fmt(r.acumuladoPct, '%')}</td>
                   <td className="px-4 py-3 text-right font-medium">{r.expedidos}</td>
+                  <td className={`px-4 py-3 text-right font-bold ${r.cancelados > 0 ? 'text-red-600' : 'text-slate-300'}`}>{r.cancelados}</td>
+                  <td className={`px-4 py-3 text-right font-bold ${r.taxaCancelamento != null && r.taxaCancelamento >= 20 ? 'text-red-600' : r.taxaCancelamento != null && r.taxaCancelamento >= 10 ? 'text-amber-600' : 'text-slate-400'}`}>{fmt(r.taxaCancelamento, '%')}</td>
                   <td className="px-4 py-3 text-right font-medium">{fmt(r.avgLeadTime, 'd')}</td>
                   <td className={`px-4 py-3 text-right font-bold ${r.slaRate != null && r.slaRate < 70 ? 'text-red-600' : r.slaRate != null && r.slaRate < 90 ? 'text-amber-600' : 'text-emerald-600'}`}>{fmt(r.slaRate, '%')}</td>
                   <td className="px-4 py-3 text-right font-bold text-slate-700">{r.pendentes}</td>

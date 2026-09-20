@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Package, X, ChevronLeft, FileText } from 'lucide-react';
+import { Download, Package, X, ChevronLeft, FileText, Ban } from 'lucide-react';
 
 // Detalhamento de um grupo de itens: do que ele é feito (as linhas, grades
 // ou tamanhos que estão dentro dele) e como está a fila em aberto por
@@ -11,8 +11,15 @@ const ItemDetailsModal = ({ selection, setSelection, rows, nivelFilhoLabel, hand
   const row = rows.find(r => r.chave === selection);
   const openPedidos = row?.openPedidos || [];
   const composicao = row?.composicao || [];
+  const canceladosPedidos = row?.canceladosPedidos || [];
+  const canceladosPorNome = row?.canceladosPorNome || [];
 
   const close = () => { setSelection(null); setDrillDown(null); };
+
+  // Num recorte de cancelados não existe "dias em aberto" — o pedido não
+  // está na fila, ele saiu dela. A última coluna vira a data de entrada.
+  const soCancelados = Boolean(drillDown && drillDown.pedidos.every(p => p.status === 'CANCELADO'));
+  const formatarData = (iso) => (iso ? iso.split('-').reverse().join('/') : '—');
 
   const statusGroups = new Map();
   openPedidos.forEach(p => {
@@ -45,8 +52,8 @@ const ItemDetailsModal = ({ selection, setSelection, rows, nivelFilhoLabel, hand
               </h3>
               <p className="text-sm text-slate-500 font-medium mt-1">
                 {drillDown
-                  ? `${drillDown.pedidos.length} pedido(s) em aberto nesse recorte`
-                  : `${row?.nomenclaturas || 0} nomenclatura(s) · ${row?.entradas || 0} entrada(s) no período · ${openPedidos.length} em aberto agora`}
+                  ? `${drillDown.pedidos.length} pedido(s) nesse recorte`
+                  : `${row?.nomenclaturas || 0} nomenclatura(s) · ${row?.entradas || 0} entrada(s) no período · ${openPedidos.length} em aberto agora · ${canceladosPedidos.length} cancelado(s) no período`}
               </p>
             </div>
           </div>
@@ -69,7 +76,7 @@ const ItemDetailsModal = ({ selection, setSelection, rows, nivelFilhoLabel, hand
                   <th className="px-4 py-3">Nomenclatura</th>
                   <th className="px-4 py-3">CAM</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Dias em Aberto</th>
+                  <th className="px-4 py-3 text-right">{soCancelados ? 'Entrada' : 'Dias em Aberto'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,7 +86,7 @@ const ItemDetailsModal = ({ selection, setSelection, rows, nivelFilhoLabel, hand
                     <td className="px-4 py-3 text-slate-600 text-xs">{p.nomenclatura}</td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{String(p.CAM || '').trim() || '—'}</td>
                     <td className="px-4 py-3 font-medium text-slate-600">{p.status}</td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-700">{p.daysOpen != null ? `${p.daysOpen}d` : '—'}</td>
+                    <td className="px-4 py-3 text-right font-bold text-slate-700">{soCancelados ? formatarData(p.dataEntrada) : p.daysOpen != null ? `${p.daysOpen}d` : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -126,6 +133,31 @@ const ItemDetailsModal = ({ selection, setSelection, rows, nivelFilhoLabel, hand
                   </div>
                 )}
               </div>
+
+              {canceladosPorNome.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-3">
+                    Cancelados no Período — por nomenclatura
+                  </p>
+                  <div className="space-y-2">
+                    {canceladosPorNome.slice(0, 15).map(c => (
+                      <button
+                        key={c.nome}
+                        onClick={() => abrir(`Cancelados · ${c.nome}`, canceladosPedidos.filter(p => p.nomenclatura === c.nome))}
+                        className="w-full flex items-center justify-between p-3.5 rounded-xl border border-red-100 bg-red-50/60 hover:bg-red-50 hover:shadow-sm transition-all text-left"
+                      >
+                        <span className="flex items-center gap-2 font-bold text-slate-700 text-sm truncate pr-4">
+                          <Ban size={14} className="text-red-400 shrink-0" /> {c.nome}
+                        </span>
+                        <span className="font-black text-red-700 shrink-0">{c.qtd}</span>
+                      </button>
+                    ))}
+                    {canceladosPorNome.length > 15 && (
+                      <p className="text-[11px] text-slate-400 italic">+ {canceladosPorNome.length - 15} outras nomenclaturas canceladas</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
