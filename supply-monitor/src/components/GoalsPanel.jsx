@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Target, Settings2, Check } from 'lucide-react';
 import InfoButton from './InfoButton';
 import OldestOrdersModal from './OldestOrdersModal';
-import { classifyStc } from '../hooks/useStcGtcAnalysis';
+import { groupOldestByDocType } from '../utils/backlogByDocType';
 
 const STATUS_COLOR = {
   good: { bar: 'bg-emerald-500', text: 'text-emerald-600' },
@@ -44,12 +44,6 @@ const GoalMeter = ({ label, value, target, unit, higherIsBetter, extra }) => {
   );
 };
 
-const DOC_GROUPS = [
-  { key: 'STC', label: 'Mais Antigo — STC', goalKey: 'oldestStcTarget' },
-  { key: 'GTC', label: 'Mais Antigo — GTC', goalKey: 'oldestGtcTarget' },
-  { key: 'NONE', label: 'Mais Antigo — Sem Documento', goalKey: 'oldestNoDocTarget' }
-];
-
 // Metas gerenciais editáveis + barras de progresso mostrando se a operação
 // está dentro do combinado (SLA, idade da fila, pedido mais antigo).
 const GoalsPanel = ({ goals, updateGoals, avgAge, stcGtcAnalysis, pendingOrders, handleDownloadExcel }) => {
@@ -60,24 +54,7 @@ const GoalsPanel = ({ goals, updateGoals, avgAge, stcGtcAnalysis, pendingOrders,
   const stcGroup = stcGtcAnalysis?.groups?.find(g => g.type === 'STC');
   const gtcGroup = stcGtcAnalysis?.groups?.find(g => g.type === 'GTC');
 
-  // Idade máxima aceitável é diferente por tipo de documento (ver
-  // useStcGtcAnalysis: STC vai para outro estado via outra OM, GTC é
-  // entrega local, e pedidos sem nenhum dos dois ainda estão no início do
-  // fluxo) — por isso o "pedido mais antigo" é 3 metas separadas, não uma
-  // média única que mistura os três casos.
-  const oldestByDocType = useMemo(() => {
-    const buckets = { STC: [], GTC: [], NONE: [] };
-    (pendingOrders || []).forEach(p => {
-      buckets[classifyStc(p.STC) || 'NONE'].push(p);
-    });
-    return DOC_GROUPS.map(({ key, label, goalKey }) => {
-      const list = buckets[key];
-      const target = goals[goalKey];
-      const oldest = list.length ? Math.max(...list.map(p => p.daysOpen)) : null;
-      const acimaDaMeta = list.filter(p => p.daysOpen > target).sort((a, b) => b.daysOpen - a.daysOpen);
-      return { key, label, target, oldest, acimaDaMeta };
-    });
-  }, [pendingOrders, goals]);
+  const oldestByDocType = useMemo(() => groupOldestByDocType(pendingOrders, goals), [pendingOrders, goals]);
 
   const startEditing = () => { setDraft(goals); setIsEditing(true); };
   const saveEditing = () => {

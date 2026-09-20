@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FileDown, Loader2, AlertCircle } from 'lucide-react';
 import InfoButton from './InfoButton';
-import { generateMonthlyReportPdf } from '../utils/pdfReport';
+import { generateMonthlyReportPdf, PDF_CONTENT_WIDTH_PX } from '../utils/pdfReport';
 import ReportDocument from './report/ReportDocument';
 
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -116,8 +116,12 @@ const MonthlyReportCard = ({ chartData, applyCustomRange, comparisonMode, setCom
           capturá-lo). Escondido via opacity+z-index, e não via
           width:0/overflow:hidden — um ancestral de tamanho zero estava
           fazendo o html2canvas capturar a largura errada (cortando as
-          últimas colunas das tabelas no PDF). */}
-      <div style={{ position: 'absolute', top: 0, left: 0, opacity: 0, zIndex: -1, pointerEvents: 'none' }} aria-hidden="true">
+          últimas colunas das tabelas no PDF).
+          A largura é fixada na largura útil da página A4 (ver pdfReport.js)
+          porque os gráficos do recharts congelam a largura em pixels no
+          momento em que são desenhados aqui — renderizar numa largura e
+          capturar em outra corta os gráficos na borda direita. */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: PDF_CONTENT_WIDTH_PX, opacity: 0, zIndex: -1, pointerEvents: 'none' }} aria-hidden="true">
         <ReportDocument ref={reportRef} monthLabel={monthLabel} periodLabel={periodLabel} comparisonLabel={comparisonLabel} {...reportProps} />
       </div>
     </div>

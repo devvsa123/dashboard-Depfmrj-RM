@@ -124,7 +124,8 @@ const DashboardTab = ({
         reportRef={reportRef}
         reportProps={{
           selectionSummary, slaAnalysis, backlogAnalysis, periodComparison, comparisonSeries, visibleRangeData,
-          alerts, health, goals, stcGtcAnalysis, rmTypeComparison, camAnalysis, interfaceAnalysis, dynamicAnalysis, yoyAnalysis
+          alerts, health, goals, stcGtcAnalysis, rmTypeComparison, camAnalysis, interfaceAnalysis, dynamicAnalysis, yoyAnalysis,
+          trendForecast, trendSeriesWithForecast, showForecast, forecastStartDate
         }}
       />
 
