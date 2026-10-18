@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarRange, Ban, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarRange, Ban, Plus, Trash2, ChevronLeft, ChevronRight, AlertCircle, Loader2, Cloud, CloudOff, UserCircle2, LogOut } from 'lucide-react';
 import SectionLabel from '../SectionLabel';
 import CapacidadePanel from './CapacidadePanel';
 import DemandasPanel from './DemandasPanel';
@@ -46,7 +46,31 @@ const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
 // continua sendo dele.
 const ProgramacaoTab = (p) => (
   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-    <SectionLabel title="Programação Semanal" description="Proposta de grade de atendimento — o programador valida, ajusta e publica" />
+    <div className="flex items-center justify-between gap-3 flex-wrap">
+      <SectionLabel title="Programação Semanal" description="Proposta de grade de atendimento — o programador valida, ajusta e publica" />
+      {p.auth?.autenticado && (
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <UserCircle2 size={14} className="text-indigo-500" /> {p.programador || p.auth.usuario?.email}
+          </span>
+          <button onClick={p.auth.sair} className="text-[11px] font-bold text-slate-400 hover:text-red-500 px-2 py-1.5 flex items-center gap-1">
+            <LogOut size={13} /> Sair
+          </button>
+        </div>
+      )}
+    </div>
+
+    {p.erroSync && (
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-sm font-medium">
+        <AlertCircle size={18} className="shrink-0 mt-0.5" /> {p.erroSync}
+      </div>
+    )}
+
+    {p.carregando && (
+      <div className="flex items-center gap-2 text-slate-400 text-sm font-bold">
+        <Loader2 size={16} className="animate-spin text-indigo-500" /> Carregando a programação...
+      </div>
+    )}
 
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div className="flex items-center gap-3">
@@ -57,6 +81,9 @@ const ProgramacaoTab = (p) => (
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <span className={`text-[11px] font-bold flex items-center gap-1.5 mr-2 ${p.salvando ? 'text-indigo-500' : 'text-slate-300'}`}>
+          {p.salvando ? <><Cloud size={14} className="animate-pulse" /> salvando</> : <><CloudOff size={14} /> salvo</>}
+        </span>
         <button onClick={() => p.setSemanaRef(segundaDaSemana(somaDias(p.semanaRef, -7)))} className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100"><ChevronLeft size={18} /></button>
         <button onClick={() => p.setSemanaRef(segundaDaSemana(somaDias(p.semanaRef, 7)))} className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100"><ChevronRight size={18} /></button>
       </div>
@@ -80,7 +107,6 @@ const ProgramacaoTab = (p) => (
         diffPendente={p.diffPendente}
         semanaRef={p.semanaRef}
         programador={p.programador}
-        setProgramador={p.setProgramador}
         encarregado={p.encarregado}
         setEncarregado={p.setEncarregado}
       />

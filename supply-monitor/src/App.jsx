@@ -18,6 +18,8 @@ import { useRmTypeComparison } from './hooks/useRmTypeComparison';
 import { useCamAnalysis } from './hooks/useCamAnalysis';
 import { useItemAnalysis, NIVEIS } from './hooks/useItemAnalysis';
 import { useProgramacao } from './hooks/useProgramacao';
+import { useAuth } from './hooks/useAuth';
+import LoginGate from './components/programacao/LoginGate';
 import { useTrendForecast } from './hooks/useTrendForecast';
 import DashboardTab from './components/DashboardTab';
 import BacklogTab from './components/BacklogTab';
@@ -54,7 +56,8 @@ const App = () => {
   const rmTypeComparison = useRmTypeComparison(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const camAnalysis = useCamAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const itemAnalysis = useItemAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
-  const programacao = useProgramacao(data);
+  const auth = useAuth();
+  const programacao = useProgramacao(data, auth);
   const trendForecast = useTrendForecast(dashboardAnalytics.chartData);
   const riskAlerts = useRiskAlerts({
     backlogAnalysis: backlogAnalysis.backlogAnalysis,
@@ -192,7 +195,9 @@ const App = () => {
               handleDownloadExcel={downloadExcel}
             />
           ) : activeTab === 'programacao' ? (
-            <ProgramacaoTab {...programacao} />
+            <LoginGate auth={auth}>
+              <ProgramacaoTab {...programacao} auth={auth} />
+            </LoginGate>
           ) : activeTab === 'email' ? (
             <EmailSearchTab
               emailText={emailExtractor.emailText}

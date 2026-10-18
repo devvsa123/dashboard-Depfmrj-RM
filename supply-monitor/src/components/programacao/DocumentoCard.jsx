@@ -8,7 +8,7 @@ import { compararVersoes, rotuloVersao } from '../../utils/programacao/versoes';
 
 // O documento sai sempre da versão PUBLICADA, nunca da proposta na tela —
 // senão o PDF impresso poderia divergir do que foi publicado.
-const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, programador, setProgramador, encarregado, setEncarregado }) => {
+const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, programador, encarregado, setEncarregado }) => {
   const ref = useRef(null);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState('');
@@ -55,7 +55,9 @@ const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, program
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Programador do DepFMRJ</label>
-          <input value={programador} onChange={e => setProgramador(e.target.value)} placeholder="Quem assina pelo DepFMRJ" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-500" />
+          <div className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700">
+            {programador || '—'}
+          </div>
         </div>
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Encarregado do Abastecimento</label>

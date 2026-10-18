@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { History, Send, AlertTriangle, CheckCircle2, Undo2 } from 'lucide-react';
+import { History, Send, AlertTriangle, CheckCircle2, Undo2, Loader2 } from 'lucide-react';
 import InfoButton from '../InfoButton';
 import { rotuloVersao } from '../../utils/programacao/versoes';
-import { PROGRAMADORES } from '../../utils/programacao/equipe';
 import { formatarBr } from '../../utils/programacao/semana';
 
 const dataHora = (iso) => {
@@ -15,8 +14,8 @@ const dataHora = (iso) => {
 // que mudou — é o que permite reprogramar no meio da semana sem que quem
 // recebe perca o fio.
 const VersoesPanel = ({ versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao, programador, resultado }) => {
-  const [por, setPor] = useState(programador || '');
   const [confirmando, setConfirmando] = useState(false);
+  const [publicando, setPublicando] = useState(false);
 
   const proxima = versoes.length;
   const temProposta = Boolean(resultado && resultado.resumo.totalProgramado > 0);
@@ -57,18 +56,18 @@ const VersoesPanel = ({ versoes, ultimaVersao, diffPendente, publicar, removerUl
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <select value={por} onChange={e => setPor(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-500 bg-white">
-            <option value="">Quem publica...</option>
-            {PROGRAMADORES.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+        <div className="space-y-2">
           <button
-            onClick={() => { publicar(por); setConfirmando(false); }}
-            disabled={!temProposta || !por || semMudancas}
-            className="flex-1 px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-40 transition-all active:scale-95"
+            onClick={async () => { setPublicando(true); await publicar(); setPublicando(false); setConfirmando(false); }}
+            disabled={!temProposta || semMudancas || publicando}
+            className="w-full px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-40 transition-all active:scale-95"
           >
-            <Send size={16} /> Publicar {rotuloVersao(proxima)}
+            {publicando ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            {publicando ? 'Publicando...' : `Publicar ${rotuloVersao(proxima)}`}
           </button>
+          <p className="text-[11px] text-slate-400 font-medium text-center">
+            Publicando como <strong className="text-slate-600">{programador || '—'}</strong>
+          </p>
         </div>
 
         {versoes.length > 0 && (
