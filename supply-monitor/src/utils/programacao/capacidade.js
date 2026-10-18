@@ -77,6 +77,14 @@ export const medirCapacidade = (data, janelaDias = 365) => {
   };
 };
 
+// O que JÁ SAIU da fila de separação. CONFERIDO entra aqui: nesse ponto o
+// pedido está pronto e entregue à Expedição, então o trabalho do depósito
+// naquela RM acabou — programá-la de novo seria contar duas vezes. É a
+// mesma régua que define "atendido" para efeito de prazo.
+export const STATUS_FORA_DA_FILA = new Set(['CONFERIDO', 'EXPEDIDO', 'CANCELADO']);
+
+export const estaNaFila = (situacao) => !STATUS_FORA_DA_FILA.has(String(situacao || '').toUpperCase().trim());
+
 // Índice rápido RM -> situação atual no WMS, usado para conferir as RMs
 // coladas e para montar a fila de atendimento.
 export const indexarWms = (data) => {
@@ -104,18 +112,19 @@ export const indexarWms = (data) => {
     }
     atual.linhas++;
     if (entrada && (!atual.entrada || entrada < atual.entrada)) atual.entrada = entrada;
-    const emFila = (s) => s !== 'EXPEDIDO' && s !== 'CANCELADO';
-    if (emFila(situacao) && !emFila(atual.situacao)) atual.situacao = situacao;
+    if (estaNaFila(situacao) && !estaNaFila(atual.situacao)) atual.situacao = situacao;
   });
   return indice;
 };
 
-// A fila de atendimento: RMs ainda em aberto, da mais antiga para a mais
-// nova. É a ordem padrão de atendimento quando não há prazo mandando.
+// A fila de SEPARAÇÃO: RMs que ainda dependem de trabalho do depósito, da
+// mais antiga para a mais nova. É a ordem padrão de atendimento quando não
+// há prazo mandando. Não confundir com a "fila em aberto" das outras abas
+// do dashboard, que inclui as CONFERIDAS aguardando expedição.
 export const filaPorAntiguidade = (indiceWms, hojeIso) => {
   const fila = [];
   indiceWms.forEach(info => {
-    if (info.situacao === 'EXPEDIDO' || info.situacao === 'CANCELADO') return;
+    if (!estaNaFila(info.situacao)) return;
     fila.push({
       ...info,
       diasEmFila: info.entrada ? Math.max(0, Math.round((new Date(hojeIso) - new Date(info.entrada)) / 86400000)) : null

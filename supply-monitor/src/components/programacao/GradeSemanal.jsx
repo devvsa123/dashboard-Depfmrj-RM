@@ -78,13 +78,14 @@ const GradeSemanal = ({ resultado }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {[
           { t: 'RMs na Semana', v: resumo.totalProgramado },
           { t: 'Capacidade', v: resumo.capacidadeTotal },
           { t: 'Ocupação', v: `${resumo.ocupacao}%` },
           { t: 'Com Prazo', v: resumo.comPrazo },
-          { t: 'CAMs Atendidos', v: resumo.camsAtendidos }
+          { t: 'CAMs Atendidos', v: resumo.camsAtendidos },
+          { t: 'Fila de Separação', v: resumo.filaTotal }
         ].map(c => (
           <div key={c.t} className="bg-white p-4 rounded-2xl border border-slate-200">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{c.t}</p>

@@ -7,6 +7,7 @@ import { formatarBr } from '../../utils/programacao/semana';
 
 const TOM_SITUACAO = {
   EM_FILA: 'text-emerald-600',
+  CONFERIDA: 'text-sky-600',
   JA_EXPEDIDA: 'text-slate-400',
   CANCELADA: 'text-red-500',
   NAO_ENCONTRADA: 'text-amber-600'

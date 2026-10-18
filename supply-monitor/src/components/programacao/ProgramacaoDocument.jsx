@@ -17,8 +17,13 @@ import { ORIGENS, limiteDeSeparacao } from '../../utils/programacao/motor';
 const ORIGEM_LABEL = Object.fromEntries(ORIGENS.map(o => [o.key, o.label]));
 ORIGEM_LABEL.ANTIGUIDADE = 'Fila por antiguidade';
 
-const Secao = ({ children }) => (
-  <div style={{ breakInside: 'avoid', paddingTop: 5, marginBottom: 15 }}>{children}</div>
+// Por padrão a seção é indivisível: o html2pdf empurra inteira a que
+// ficaria partida ao meio. A grade por CAM é a exceção — ela cresce com o
+// número de clientes e, se for indivisível, uma semana com muitos CAMs
+// empurra a tabela toda para a página seguinte e deixa a primeira quase
+// em branco. Nela a quebra acontece entre linhas.
+const Secao = ({ children, quebravel }) => (
+  <div style={{ breakInside: quebravel ? 'auto' : 'avoid', paddingTop: 5, marginBottom: 15 }}>{children}</div>
 );
 
 const Titulo = ({ numero, texto }) => (
@@ -38,22 +43,22 @@ const estiloCol = (col) => ({
   wordBreak: 'break-word'
 });
 
-const Tabela = ({ colunas, linhas, rodape }) => (
-  <div style={{ breakInside: 'avoid', paddingBottom: 4 }}>
-    <div style={{ display: 'flex', borderBottom: '1.5px solid #334155', padding: '5px 8px' }}>
+const Tabela = ({ colunas, linhas, rodape, quebravel }) => (
+  <div style={{ breakInside: quebravel ? 'auto' : 'avoid', paddingBottom: 4 }}>
+    <div style={{ display: 'flex', borderBottom: '1.5px solid #334155', padding: '5px 8px', breakInside: 'avoid', breakAfter: 'avoid' }}>
       {colunas.map(c => (
         <div key={c.key} style={estiloCol(c)} className="text-slate-700 font-bold uppercase text-[9px] tracking-wide">{c.label}</div>
       ))}
     </div>
     {linhas.map((linha, i) => (
-      <div key={i} style={{ display: 'flex', backgroundColor: i % 2 === 1 ? '#f8fafc' : 'transparent', borderBottom: '1px solid #e2e8f0', padding: '4px 8px' }}>
+      <div key={i} style={{ display: 'flex', backgroundColor: i % 2 === 1 ? '#f8fafc' : 'transparent', borderBottom: '1px solid #e2e8f0', padding: '4px 8px', breakInside: 'avoid' }}>
         {colunas.map(c => (
           <div key={c.key} style={estiloCol(c)} className={`text-[10px] ${c.emphasis ? 'font-bold text-slate-800' : 'text-slate-600'}`}>{linha[c.key]}</div>
         ))}
       </div>
     ))}
     {rodape && (
-      <div style={{ display: 'flex', background: '#e2e8f0', padding: '5px 8px', borderTop: '1.5px solid #334155' }}>
+      <div style={{ display: 'flex', background: '#e2e8f0', padding: '5px 8px', borderTop: '1.5px solid #334155', breakInside: 'avoid' }}>
         {colunas.map(c => (
           <div key={c.key} style={estiloCol(c)} className="text-[10px] font-black text-slate-900">{rodape[c.key]}</div>
         ))}
@@ -157,13 +162,14 @@ const ProgramacaoDocument = forwardRef(({ resultado, semanaRef, demandas, bloque
         </div>
         <p className="text-[10px] text-slate-600" style={{ marginTop: 10, lineHeight: '15px' }}>
           Das {resumo.totalProgramado} RMs programadas, {resumo.comPrazo} atendem demanda com prazo definido e {resumo.porAntiguidade} saem
-          da fila por antiguidade. A fila em aberto no WMS soma {resumo.filaTotal} RMs.
+          da fila por antiguidade. A fila de separação soma {resumo.filaTotal} RMs — pedidos que ainda dependem de trabalho do depósito,
+          sem contar os já conferidos e entregues à Expedição.
         </p>
     </Secao>);
 
-    secoes.push(<Secao>
+    secoes.push(<Secao quebravel>
         <Titulo numero="2" texto="Grade de Atendimento por CAM" />
-        <Tabela colunas={colsCam} linhas={linhasCam} rodape={rodapeCam} />
+        <Tabela colunas={colsCam} linhas={linhasCam} rodape={rodapeCam} quebravel />
     </Secao>);
 
       if (bloqueios.length > 0)       secoes.push(<Secao>

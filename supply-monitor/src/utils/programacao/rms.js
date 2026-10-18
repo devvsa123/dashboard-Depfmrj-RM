@@ -29,6 +29,7 @@ export const extrairRms = (texto) => {
 // no meio da semana.
 export const SITUACOES = {
   EM_FILA: 'EM_FILA',
+  CONFERIDA: 'CONFERIDA',
   JA_EXPEDIDA: 'JA_EXPEDIDA',
   CANCELADA: 'CANCELADA',
   NAO_ENCONTRADA: 'NAO_ENCONTRADA'
@@ -36,16 +37,20 @@ export const SITUACOES = {
 
 export const SITUACAO_LABEL = {
   EM_FILA: 'Em fila — será programada',
+  CONFERIDA: 'Já conferida — com a Expedição',
   JA_EXPEDIDA: 'Já expedida — nada a fazer',
   CANCELADA: 'Cancelada no WMS',
   NAO_ENCONTRADA: 'Não encontrada no WMS'
 };
 
 export const conferirRms = (rms, indiceWms) => {
-  const resultado = { [SITUACOES.EM_FILA]: [], [SITUACOES.JA_EXPEDIDA]: [], [SITUACOES.CANCELADA]: [], [SITUACOES.NAO_ENCONTRADA]: [] };
+  const resultado = Object.fromEntries(Object.values(SITUACOES).map(k => [k, []]));
   rms.forEach(rm => {
     const info = indiceWms.get(rm);
     if (!info) { resultado[SITUACOES.NAO_ENCONTRADA].push({ rm }); return; }
+    // CONFERIDA já está pronta e com a Expedição: o depósito não tem mais
+    // o que separar nela, então ela não entra na programação.
+    if (info.situacao === 'CONFERIDO') { resultado[SITUACOES.CONFERIDA].push({ rm, ...info }); return; }
     if (info.situacao === 'EXPEDIDO') { resultado[SITUACOES.JA_EXPEDIDA].push({ rm, ...info }); return; }
     if (info.situacao === 'CANCELADO') { resultado[SITUACOES.CANCELADA].push({ rm, ...info }); return; }
     resultado[SITUACOES.EM_FILA].push({ rm, ...info });
