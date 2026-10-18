@@ -1,0 +1,278 @@
+import { forwardRef, Fragment } from 'react';
+import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana } from '../../utils/programacao/semana';
+import { ORIGENS, limiteDeSeparacao } from '../../utils/programacao/motor';
+
+// -----------------------------------------------------------------------
+// Documento estático da programação semanal. Como o relatório mensal, não
+// reaproveita os cartões da tela: é uma renderização paralela pensada para
+// ser lida em papel e assinada. Fica fora da tela e só é capturada na hora
+// de gerar o PDF.
+//
+// Tabelas em flexbox, e não <table>: o html2canvas respeita mal a largura
+// de coluna de tabelas HTML e corta a última coluna na borda da página.
+// As larguras precisam somar exatamente 100%, porque cada coluna é
+// `flex: 0 0 X%`.
+// -----------------------------------------------------------------------
+
+const ORIGEM_LABEL = Object.fromEntries(ORIGENS.map(o => [o.key, o.label]));
+ORIGEM_LABEL.ANTIGUIDADE = 'Fila por antiguidade';
+
+const Secao = ({ children }) => (
+  <div style={{ breakInside: 'avoid', paddingTop: 5, marginBottom: 15 }}>{children}</div>
+);
+
+const Titulo = ({ numero, texto }) => (
+  <div style={{ marginBottom: 9, breakAfter: 'avoid' }}>
+    <div className="flex items-center gap-2.5">
+      <span style={{ background: '#1e3a8a', color: '#fff', width: 22, height: 22, borderRadius: 5, textAlign: 'center', lineHeight: '22px' }} className="text-xs font-black">{numero}</span>
+      <h2 className="text-sm font-black text-slate-900 uppercase tracking-wide">{texto}</h2>
+    </div>
+    <div className="h-px bg-slate-300 mt-2.5" />
+  </div>
+);
+
+const estiloCol = (col) => ({
+  flex: `0 0 ${col.width}`,
+  minWidth: 0,
+  textAlign: col.align || 'left',
+  wordBreak: 'break-word'
+});
+
+const Tabela = ({ colunas, linhas, rodape }) => (
+  <div style={{ breakInside: 'avoid', paddingBottom: 4 }}>
+    <div style={{ display: 'flex', borderBottom: '1.5px solid #334155', padding: '5px 8px' }}>
+      {colunas.map(c => (
+        <div key={c.key} style={estiloCol(c)} className="text-slate-700 font-bold uppercase text-[9px] tracking-wide">{c.label}</div>
+      ))}
+    </div>
+    {linhas.map((linha, i) => (
+      <div key={i} style={{ display: 'flex', backgroundColor: i % 2 === 1 ? '#f8fafc' : 'transparent', borderBottom: '1px solid #e2e8f0', padding: '4px 8px' }}>
+        {colunas.map(c => (
+          <div key={c.key} style={estiloCol(c)} className={`text-[10px] ${c.emphasis ? 'font-bold text-slate-800' : 'text-slate-600'}`}>{linha[c.key]}</div>
+        ))}
+      </div>
+    ))}
+    {rodape && (
+      <div style={{ display: 'flex', background: '#e2e8f0', padding: '5px 8px', borderTop: '1.5px solid #334155' }}>
+        {colunas.map(c => (
+          <div key={c.key} style={estiloCol(c)} className="text-[10px] font-black text-slate-900">{rodape[c.key]}</div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+// Área de assinatura. Nada de linha para assinar à mão: o DepFMRJ assina
+// com token no próprio PDF, então o que o documento precisa oferecer é um
+// retângulo limpo onde o carimbo digital cabe, com a identificação logo
+// abaixo.
+const Assinaturas = ({ programador, encarregado }) => (
+  <div style={{ breakInside: 'avoid', marginTop: 18 }}>
+    <div style={{ display: 'flex', gap: 28 }}>
+      {[
+        { nome: programador, papel: 'Programador do DepFMRJ' },
+        { nome: encarregado, papel: 'Encarregado do Abastecimento' }
+      ].map(bloco => (
+        <div key={bloco.papel} style={{ flex: '1 1 0', minWidth: 0 }}>
+          <div style={{ height: 54, border: '1px dashed #94a3b8', borderRadius: 4 }} />
+          <p className="text-[10px] font-black text-slate-900 text-center uppercase" style={{ marginTop: 6 }}>{bloco.nome || '—'}</p>
+          <p className="text-[9px] text-slate-500 text-center">{bloco.papel}</p>
+        </div>
+      ))}
+    </div>
+    <p className="text-[8px] text-slate-400 text-center" style={{ marginTop: 10 }}>
+      Documento assinado digitalmente por certificado em token. O carimbo de assinatura deve ser aposto nas áreas acima.
+    </p>
+  </div>
+);
+
+const ProgramacaoDocument = forwardRef(({ resultado, semanaRef, demandas, bloqueios, programador, encarregado, versao, emitidoEm }, ref) => {
+  if (!resultado) return <div ref={ref} />;
+  const { grade, porCam, resumo, alertas } = resultado;
+
+  // Grade por CAM: 5 dias + CAM + total. As larguras somam exatamente 100%.
+  const colsCam = [
+    { key: 'cam', label: 'CAM', width: '34%', emphasis: true },
+    ...grade.map(s => ({ key: s.dia, label: formatarCurto(s.dia), width: '11%', align: 'center' })),
+    { key: 'total', label: 'Total', width: '11%', align: 'right', emphasis: true }
+  ];
+  const linhasCam = porCam.map(l => ({
+    cam: l.cam,
+    ...Object.fromEntries(grade.map(s => [s.dia, l.porDia[s.dia] || '—'])),
+    total: l.total
+  }));
+  const rodapeCam = {
+    cam: 'TOTAL',
+    ...Object.fromEntries(grade.map(s => [s.dia, s.alocacoes.length])),
+    total: resumo.totalProgramado
+  };
+
+  const comPrazo = demandas.filter(d => d.prazo && d.rmsEmFila?.length);
+
+  // Anexo: agrupa por dia, depois por origem e CAM. Listar 400 linhas uma a
+  // uma não se lê; agrupado, cada linha já traz o porquê de todas as RMs
+  // daquele bloco.
+  const anexo = grade.filter(s => s.alocacoes.length).map(slot => {
+    const grupos = new Map();
+    slot.alocacoes.forEach(a => {
+      const cam = a.cam || '(sem CAM)';
+      // Na fila por antiguidade a justificativa carrega os dias de cada RM,
+      // então agrupar por ela devolveria um grupo por RM. O que interessa
+      // ali é o CAM e a faixa de espera, resumida depois.
+      const chave = a.origem === 'ANTIGUIDADE' ? `ANTIGUIDADE||${cam}` : `${a.justificativa}||${cam}`;
+      if (!grupos.has(chave)) {
+        grupos.set(chave, { justificativa: a.justificativa, cam, origem: a.origem, rms: [], dias: [] });
+      }
+      const g = grupos.get(chave);
+      g.rms.push(a.rm);
+      if (a.diasEmFila != null) g.dias.push(a.diasEmFila);
+    });
+    grupos.forEach(g => {
+      if (g.origem !== 'ANTIGUIDADE' || !g.dias.length) return;
+      const min = Math.min(...g.dias);
+      const max = Math.max(...g.dias);
+      g.justificativa = min === max
+        ? `Fila por antiguidade — ${max} dias em espera`
+        : `Fila por antiguidade — de ${min} a ${max} dias em espera`;
+    });
+    return { slot, grupos: Array.from(grupos.values()).sort((a, b) => b.rms.length - a.rms.length) };
+  });
+
+  const secoes = [];
+    secoes.push(<Secao>
+        <Titulo numero="1" texto="Resumo da Semana" />
+        <div style={{ display: 'flex', gap: 10 }}>
+          {[
+            { r: 'RMs programadas', v: resumo.totalProgramado },
+            { r: 'Capacidade da semana', v: resumo.capacidadeTotal },
+            { r: 'Ocupação', v: `${resumo.ocupacao}%` },
+            { r: 'Com prazo', v: resumo.comPrazo },
+            { r: 'CAMs atendidos', v: resumo.camsAtendidos }
+          ].map(c => (
+            <div key={c.r} style={{ flex: '1 1 0', minWidth: 0, border: '1px solid #cbd5e1', borderRadius: 5, padding: '6px 9px' }}>
+              <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wide">{c.r}</p>
+              <p className="text-base font-black text-slate-900" style={{ lineHeight: '20px' }}>{c.v}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-slate-600" style={{ marginTop: 10, lineHeight: '15px' }}>
+          Das {resumo.totalProgramado} RMs programadas, {resumo.comPrazo} atendem demanda com prazo definido e {resumo.porAntiguidade} saem
+          da fila por antiguidade. A fila em aberto no WMS soma {resumo.filaTotal} RMs.
+        </p>
+    </Secao>);
+
+    secoes.push(<Secao>
+        <Titulo numero="2" texto="Grade de Atendimento por CAM" />
+        <Tabela colunas={colsCam} linhas={linhasCam} rodape={rodapeCam} />
+    </Secao>);
+
+      if (bloqueios.length > 0)       secoes.push(<Secao>
+          <Titulo numero="3" texto="Dias sem Separação" />
+          <Tabela
+            colunas={[
+              { key: 'data', label: 'Data', width: '22%', emphasis: true },
+              { key: 'dia', label: 'Dia da semana', width: '26%' },
+              { key: 'motivo', label: 'Motivo', width: '52%' }
+            ]}
+            linhas={bloqueios.map(b => ({
+              data: formatarBr(b.data),
+              dia: DIAS_SEMANA[new Date(b.data + 'T00:00:00Z').getUTCDay()],
+              motivo: b.motivo
+            }))}
+          />
+      </Secao>);
+
+      if (comPrazo.length > 0)       secoes.push(<Secao>
+          <Titulo numero={bloqueios.length > 0 ? '4' : '3'} texto="Demandas com Prazo" />
+          <Tabela
+            colunas={[
+              { key: 'ref', label: 'Origem / Referência', width: '40%', emphasis: true },
+              { key: 'rms', label: 'RMs', width: '12%', align: 'center' },
+              { key: 'prazo', label: 'Prazo', width: '16%', align: 'center' },
+              { key: 'limite', label: 'Separar até', width: '16%', align: 'center' },
+              { key: 'exp', label: 'Dias exped.', width: '16%', align: 'center' }
+            ]}
+            linhas={comPrazo.map(d => ({
+              ref: `${ORIGEM_LABEL[d.origem] || d.origem}${d.referencia ? ` — ${d.referencia}` : ''}`,
+              rms: d.rmsEmFila.length,
+              prazo: formatarBr(d.prazo),
+              limite: formatarBr(limiteDeSeparacao(d.prazo, d.diasExpedicao)),
+              exp: `${d.diasExpedicao} úteis`
+            }))}
+          />
+      </Secao>);
+
+      if (alertas.length > 0)       secoes.push(<Secao>
+          <Titulo numero={[bloqueios.length > 0, comPrazo.length > 0].filter(Boolean).length + 3} texto="Observações" />
+          {alertas.map((a, i) => (
+            <div key={i} style={{ borderLeft: `3px solid ${a.nivel === 'critico' ? '#dc2626' : '#d97706'}`, padding: '3px 0 3px 10px', marginBottom: 6, breakInside: 'avoid' }}>
+              <p className="text-[10px] text-slate-700" style={{ lineHeight: '14px' }}>{a.texto}</p>
+            </div>
+          ))}
+      </Secao>);
+
+
+  return (
+    <div ref={ref} style={{ width: '100%', background: '#fff', padding: '4px 0', fontFamily: 'Helvetica, Arial, sans-serif' }}>
+      {/* Cabeçalho */}
+      <div style={{ textAlign: 'center', marginBottom: 14 }}>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Marinha do Brasil</p>
+        <p className="text-[11px] font-black text-slate-700 uppercase tracking-wide">Depósito de Fardamento da Marinha no Rio de Janeiro</p>
+        <h1 className="text-base font-black text-slate-900 uppercase tracking-wide" style={{ marginTop: 8 }}>Programação Semanal de Atendimento</h1>
+        <p className="text-xs font-bold text-slate-600" style={{ marginTop: 2 }}>Semana de {rotuloSemana(semanaRef)}</p>
+        <div style={{ display: 'inline-block', marginTop: 8, padding: '3px 14px', border: '1px solid #1e3a8a', borderRadius: 4 }}>
+          <span className="text-[10px] font-black text-blue-900 uppercase tracking-wide">{versao}</span>
+        </div>
+        <div className="h-0.5 bg-slate-800" style={{ marginTop: 10 }} />
+      </div>
+
+      {secoes.map((sec, i) => (
+        i === secoes.length - 1
+          // A assinatura nunca pode cair sozinha numa página: ela vai
+          // dentro do mesmo bloco da última seção, que já é indivisível.
+          ? <div key={i} style={{ breakInside: 'avoid' }}>
+              {sec}
+              <Assinaturas programador={programador} encarregado={encarregado} />
+            </div>
+          : <Fragment key={i}>{sec}</Fragment>
+      ))}
+
+      {/* ───────────────── ANEXO A ───────────────── */}
+      <div style={{ breakBefore: 'page', paddingTop: 10 }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <h1 className="text-base font-black text-slate-900 uppercase tracking-wide">Anexo A — Detalhamento do Atendimento</h1>
+          <p className="text-[10px] text-slate-500" style={{ marginTop: 3 }}>
+            Semana de {rotuloSemana(semanaRef)} · {versao} · emitido em {emitidoEm}
+          </p>
+          <div className="h-0.5 bg-slate-800" style={{ marginTop: 12 }} />
+        </div>
+        <p className="text-[10px] text-slate-600" style={{ marginBottom: 16, lineHeight: '15px' }}>
+          Relação das RMs programadas, por dia, com a razão de cada bloco estar na grade. As RMs de uma mesma origem e
+          mesmo CAM aparecem agrupadas numa linha só.
+        </p>
+
+        {anexo.map(({ slot, grupos }) => (
+          <div key={slot.dia} style={{ breakInside: 'avoid', marginBottom: 18 }}>
+            <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 5 }}>
+              {DIAS_SEMANA[new Date(slot.dia + 'T00:00:00Z').getUTCDay()]}, {formatarBr(slot.dia)} — {slot.alocacoes.length} RM(s)
+            </p>
+            <div className="h-px bg-slate-300" style={{ marginBottom: 8 }} />
+            {grupos.map((g, i) => (
+              <div key={i} style={{ marginBottom: 9, breakInside: 'avoid' }}>
+                <p className="text-[10px] font-bold text-slate-800">
+                  {g.cam} — {g.rms.length} RM(s) · <span className="font-normal text-slate-500">{g.justificativa}</span>
+                </p>
+                <p className="text-[9px] text-slate-500" style={{ lineHeight: '13px', marginTop: 1, wordBreak: 'break-word' }}>
+                  {g.rms.join(', ')}
+                </p>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+ProgramacaoDocument.displayName = 'ProgramacaoDocument';
+export default ProgramacaoDocument;

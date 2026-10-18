@@ -4,6 +4,7 @@ import SectionLabel from '../SectionLabel';
 import CapacidadePanel from './CapacidadePanel';
 import DemandasPanel from './DemandasPanel';
 import GradeSemanal from './GradeSemanal';
+import DocumentoCard from './DocumentoCard';
 import { rotuloSemana, somaDias, segundaDaSemana, formatarBr } from '../../utils/programacao/semana';
 
 const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
@@ -61,6 +62,17 @@ const ProgramacaoTab = (p) => (
     </div>
 
     {p.resultado && <GradeSemanal resultado={p.resultado} />}
+
+    <DocumentoCard
+      resultado={p.resultado}
+      semanaRef={p.semanaRef}
+      demandas={p.demandas}
+      bloqueios={p.bloqueios}
+      programador={p.programador}
+      setProgramador={p.setProgramador}
+      encarregado={p.encarregado}
+      setEncarregado={p.setEncarregado}
+    />
 
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <DemandasPanel demandas={p.demandas} adicionarDemanda={p.adicionarDemanda} removerDemanda={p.removerDemanda} />

@@ -24,12 +24,14 @@ export const useProgramacao = (data) => {
   const [bloqueios, setBloqueios] = useState(() => inicial.bloqueios || []);
   const [overrides, setOverrides] = useState(() => inicial.overrides || {});
   const [janelaDias, setJanelaDias] = useState(() => inicial.janelaDias || 365);
+  const [programador, setProgramador] = useState(() => inicial.programador || '');
+  const [encarregado, setEncarregado] = useState(() => inicial.encarregado || '');
 
   useEffect(() => {
     try {
-      localStorage.setItem(CHAVE, JSON.stringify({ semanaRef, demandas, bloqueios, overrides, janelaDias }));
+      localStorage.setItem(CHAVE, JSON.stringify({ semanaRef, demandas, bloqueios, overrides, janelaDias, programador, encarregado }));
     } catch { /* cota cheia ou modo privado: a programação segue na memória */ }
-  }, [semanaRef, demandas, bloqueios, overrides, janelaDias]);
+  }, [semanaRef, demandas, bloqueios, overrides, janelaDias, programador, encarregado]);
 
   const indiceWms = useMemo(() => indexarWms(data), [data]);
   const capacidadeMedida = useMemo(() => medirCapacidade(data, janelaDias), [data, janelaDias]);
@@ -96,6 +98,7 @@ export const useProgramacao = (data) => {
     bloqueios, adicionarBloqueio, removerBloqueio,
     overrides, definirOverride,
     janelaDias, setJanelaDias, janelas: JANELAS,
+    programador, setProgramador, encarregado, setEncarregado,
     capacidadeMedida, fila, resultado
   };
 };
