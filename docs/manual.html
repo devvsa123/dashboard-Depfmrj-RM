@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Manual do Operador</title>
+<link rel="stylesheet" href="estilo.css"></head><body>
+
+<div class="capa">
+  <p class="om">Marinha do Brasil<strong>Depósito de Fardamento da Marinha no Rio de Janeiro</strong></p>
+  <div class="faixa"></div>
+  <h1>Manual do Operador</h1>
+  <p class="sub">Programação Semanal de Atendimento</p>
+  <p class="sub" style="font-size:10pt;color:#94a3b8;margin-top:6mm">Monitor Logístico — Dashboard de acompanhamento de RM</p>
+  <p class="rodape">Documento de uso interno · Outubro de 2026</p>
+</div>
+
+<div class="sumario">
+  <h1 class="secao">Sumário</h1>
+  <ol>
+    <li>Para que serve esta ferramenta</li>
+    <li>Entrar no sistema</li>
+    <li>Escolher a semana</li>
+    <li>Ler a proposta de programação</li>
+    <li>Registrar demandas com prazo</li>
+    <li>Conferir a capacidade dos dias</li>
+    <li>Marcar dias sem separação</li>
+    <li>Publicar a programação</li>
+    <li>Baixar e assinar o documento</li>
+    <li>Alterar no meio da semana</li>
+    <li>Acompanhar o andamento</li>
+    <li>O que fazer quando...</li>
+  </ol>
+</div>
+
+<h1 class="secao">1. Para que serve esta ferramenta</h1>
+<p>A ferramenta monta a <strong>grade de atendimento da semana</strong>: quais RMs serão separadas em cada dia, para quais CAM, e por quê. Ela não decide sozinha — ela <em>propõe</em>, e o programador valida.</p>
+<p>A proposta é montada a partir de duas prioridades:</p>
+<ul>
+  <li><strong>Demandas com prazo</strong> — as RMs que chegam por mensagem, com data para cumprir. Entram primeiro, agendadas de trás para frente a partir do prazo.</li>
+  <li><strong>Fila por antiguidade</strong> — o que sobrar da capacidade de cada dia é preenchido com as RMs mais antigas da fila.</li>
+</ul>
+<p>No fim, sai um documento em PDF pronto para assinatura do Programador e do Encarregado do Abastecimento.</p>
+
+<div class="dica"><b>Em uma frase</b>O sistema propõe a semana, você ajusta o que precisar, publica, imprime e assina.</div>
+
+<div class="atencao"><b>Sobre as telas deste manual</b>As imagens foram feitas com <strong>dados de exemplo</strong>, para não expor pedidos reais. Os números que aparecem nelas servem para você reconhecer a tela, não para comparar com a operação — no sistema de verdade eles serão outros.</div>
+
+<h2>Onde fica</h2>
+<p>No dashboard, aba <strong>Programação</strong>. As outras abas são de acompanhamento geral e não têm senha; só a Programação exige login.</p>
+<figure><img src="img/01-abas.png"><figcaption>As abas do dashboard. A última da sua rotina é a Programação.</figcaption></figure>
+
+<h1 class="secao">2. Entrar no sistema</h1>
+
+<div class="passo">
+  <div class="passo-cab"><span class="passo-num">Passo 1</span><h2>Clique na aba Programação</h2></div>
+  <p>Aparece a tela de acesso. Enquanto você não entrar, nada da programação é exibido — nem para você, nem para quem abrir o dashboard de outro computador.</p>
+  <figure class="estreita"><img src="img/02-login.png"><figcaption>Tela de acesso da Programação.</figcaption></figure>
+</div>
+
+<div class="passo">
+  <div class="passo-cab"><span class="passo-num">Passo 2</span><h2>Digite seu e-mail e sua senha</h2></div>
+  <p>São os dados que o administrador cadastrou para você. Não existe tela de autocadastro: quem dá acesso é o administrador do sistema.</p>
+  <figure class="estreita"><img src="img/02b-login-preenchido.png"><figcaption>Preencha e clique em Entrar.</figcaption></figure>
+</div>
+
+<div class="atencao"><b>Se aparecer "E-mail ou senha incorretos"</b>Confira se não há espaço sobrando no e-mail. Se persistir, procure o administrador — ele redefine sua senha em um minuto.</div>
+
+<p>Depois de entrar, seu nome aparece no canto superior direito. <strong>É esse nome que vai impresso no documento</strong> como Programador do DepFMRJ, e é ele que fica registrado em cada publicação.</p>
+<figure><img src="img/03-subabas.png"><figcaption>As duas sub-abas e, à direita, quem está logado.</figcaption></figure>
+
+<h1 class="secao">3. Escolher a semana</h1>
+<p>O sistema já abre na <strong>semana que vem</strong>, que é o caso normal: a programação é feita na semana anterior. As setas movem uma semana para trás ou para frente.</p>
+<figure><img src="img/04-semana.png"><figcaption>Use as setas para mudar de semana. À esquerda delas, o aviso de "salvando" / "salvo".</figcaption></figure>
+<div class="dica"><b>Tudo é salvo sozinho</b>Não existe botão de salvar. Cada alteração vai direto para o banco, e os outros programadores enxergam na hora. O indicador ao lado das setas mostra quando está gravando.</div>
+
+<h1 class="secao">4. Ler a proposta de programação</h1>
+<p>Esta é a parte mais importante do seu trabalho: <strong>entender o que o sistema propôs antes de aprovar</strong>.</p>
+
+<h3>Os números da semana</h3>
+<figure><img src="img/05-resumo.png"><figcaption>Resumo da semana proposta.</figcaption></figure>
+<table>
+  <tr><th>Indicador</th><th>O que significa</th></tr>
+  <tr><td><strong>RMs na Semana</strong></td><td>Quantas RMs a proposta coloca na grade</td></tr>
+  <tr><td><strong>Capacidade</strong></td><td>Quanto a equipe consegue fazer, somando os cinco dias</td></tr>
+  <tr><td><strong>Ocupação</strong></td><td>O quanto da capacidade foi usado. 100% significa semana cheia</td></tr>
+  <tr><td><strong>Com Prazo</strong></td><td>Quantas dessas RMs vêm de mensagem com data para cumprir</td></tr>
+  <tr><td><strong>CAMs Atendidos</strong></td><td>Quantos clientes diferentes recebem alguma coisa na semana</td></tr>
+  <tr><td><strong>Fila de Separação</strong></td><td>Tudo que está esperando no WMS, não só o desta semana</td></tr>
+</table>
+
+<h3>O que cai em cada dia</h3>
+<figure><img src="img/06-dias.png"><figcaption>Cada cartão mostra o programado e a capacidade daquele dia.</figcaption></figure>
+<p>O número grande é o que foi programado; o "de N" abaixo é a capacidade do dia. Clique em <strong>ver RMs</strong> para abrir a lista.</p>
+
+<div class="passo">
+  <div class="passo-cab"><span class="passo-num">Importante</span><h2>Cada RM mostra por que está ali</h2></div>
+  <p>Na lista do dia, a última coluna explica a razão de cada RM estar naquela data. É isso que permite você validar em vez de só aceitar.</p>
+  <figure><img src="img/08-detalhe-dia.png"><figcaption>Lista de um dia: RM, CAM e o motivo de estar na grade.</figcaption></figure>
+</div>
+
+<h3>O atendimento por CAM</h3>
+<p>Esta tabela é o coração do documento final — é por ela que a chefia e os clientes leem a semana.</p>
+<figure><img src="img/07-cam.png"><figcaption>Quantas RMs cada CAM recebe, por dia, com os totais.</figcaption></figure>
+
+<h1 class="secao">5. Registrar demandas com prazo</h1>
+<p>Quando chega uma mensagem cobrando atendimento com data, ela entra aqui. O sistema passa a tratar essas RMs como prioridade e as agenda de modo que a Expedição ainda tenha tempo de prontificar.</p>
+
+<div class="passo">
+  <div class="passo-cab"><span class="passo-num">Passo 1</span><h2>Cole a relação de RMs</h2></div>
+  <p>Copie da mensagem e cole no campo. <strong>Não precisa limpar o texto</strong> — o sistema procura os números de 8 dígitos e ignora o resto. Funciona com <code>15.757.540</code> e com <code>15757540</code>.</p>
+  <figure><img src="img/09-demandas-vazio.png"><figcaption>O campo aceita o texto da mensagem como veio.</figcaption></figure>
+</div>
+
+<div class="passo">
+  <div class="passo-cab"><span class="passo-num">Passo 2</span><h2>Preencha origem, referência e prazo</h2></div>
+  <table>
+    <tr><th>Campo</th><th>O que colocar</th></tr>
+    <tr><td><strong>Origem</strong></td><td>Mensagem, Gerência de Fardamento ou Outra demanda</td></tr>
+    <tr><td><strong>Referência</strong></td><td>O identificador da mensagem, como <code>Msg CSUPAB R151612Z/OUT/2026</code>. Sai impresso no documento</td></tr>
+    <tr><td><strong>Prazo (EMI STC)</strong></td><td>A data que a origem cobrou para a emissão da STC</td></tr>
+    <tr><td><strong>Dias p/ expedição</strong></td><td>Quantos dias úteis a Expedição precisa depois da separação. O padrão é 3</td></tr>
+  </table>
+  <p>Assim que você informa o prazo, o sistema calcula e mostra <strong>até quando a separação precisa terminar</strong>.</p>
+  <figure><img src="img/10-demanda-preenchida.png"><figcaption>Com o prazo preenchido, aparece a data limite para a separação.</figcaption></figure>
+</div>
+
+<div class="passo">
+  <div class="passo-cab"><span class="passo-num">Passo 3</span><h2>Clique em Registrar demanda</h2></div>
+  <p>A demanda entra na lista e a grade se refaz sozinha. Repare na linha verde: ela confere <strong>cada RM contra o WMS</strong> e diz quantas realmente serão programadas.</p>
+  <figure><img src="img/11-demanda-registrada.png"><figcaption>Demanda registrada, com a conferência das RMs.</figcaption></figure>
+</div>
+
+<h3>A conferência das RMs</h3>
+<p>Essa checagem evita programar trabalho que não existe:</p>
+<table>
+  <tr><th>Situação</th><th>O que significa</th></tr>
+  <tr><td><strong>Em fila</strong></td><td>Será programada. É o caso normal</td></tr>
+  <tr><td><strong>Já conferida</strong></td><td>Pronta, com a Expedição. O depósito não tem mais o que fazer</td></tr>
+  <tr><td><strong>Já expedida</strong></td><td>Saiu. Nada a fazer</td></tr>
+  <tr><td><strong>Cancelada</strong></td><td>Cancelada no WMS</td></tr>
+  <tr><td><strong>Não encontrada</strong></td><td>O número não existe na base. Confira se copiou certo</td></tr>
+</table>
+
+<h1 class="secao">6. Conferir a capacidade dos dias</h1>
+<p>A capacidade de cada dia da semana é <strong>medida no histórico</strong>: é a média de RMs que saíram naquele dia da semana, contando os dias parados. É por isso que sexta-feira aparece com capacidade menor — é o que a operação realmente entrega às sextas.</p>
+<figure><img src="img/12-capacidade.png"><figcaption>Capacidade medida, com a janela de medição e o ajuste manual de cada dia.</figcaption></figure>
+
+<ul>
+  <li><strong>12 semanas / 6 meses / 12 meses</strong> — muda a janela do cálculo. Janela curta reage mais rápido a mudanças recentes; janela longa é mais estável.</li>
+  <li><strong>O campo de número</strong> — você sobrescreve o dia que quiser. Quando sobrescrito, fica em âmbar e o valor medido continua visível ao lado, para comparação.</li>
+</ul>
+
+<div class="dica"><b>Quando ajustar na mão</b>Quando você sabe algo que a média não sabe: equipe reduzida, mutirão marcado, recebimento grande chegando. O número medido é um ponto de partida, não uma ordem.</div>
+
+<h1 class="secao">7. Marcar dias sem separação</h1>
+<p>Feriado, licença, inventário, outra tarefa. O dia marcado tem a capacidade zerada e a grade se redistribui sozinha.</p>
+<figure><img src="img/13-bloqueio.png"><figcaption>Informe a data e o motivo. O motivo sai impresso no documento.</figcaption></figure>
+<p>Veja o efeito na grade — a quarta-feira ficou sem programação e o trabalho foi para os outros dias:</p>
+<figure><img src="img/14-dias-apos-bloqueio.png"><figcaption>Quarta-feira bloqueada: a grade se refez.</figcaption></figure>
+
+<div class="atencao"><b>Escreva o motivo com cuidado</b>Ele vai impresso no documento que a chefia lê. É o que justifica a semana mais curta.</div>
+
+<h1 class="secao">8. Publicar a programação</h1>
+<p>Publicar <strong>congela</strong> a programação da semana. A partir desse momento ela vira um registro: nada que você mexer depois altera o que já foi publicado.</p>
+<figure><img src="img/15-versoes-antes.png"><figcaption>Antes da primeira publicação.</figcaption></figure>
+<p>A primeira publicação da semana sai como <strong>Original</strong>. Clique no botão — você publica com o seu nome, o que está logado.</p>
+<figure><img src="img/17-versoes-depois.png"><figcaption>Depois de publicada: a versão fica registrada com data, hora, autor e total de RMs.</figcaption></figure>
+
+<div class="dica"><b>Publicou errado?</b>O ícone de desfazer ao lado da última versão remove a publicação, com confirmação. Só a última pode ser desfeita.</div>
+
+<h1 class="secao">9. Baixar e assinar o documento</h1>
+<p>Antes de baixar, preencha o <strong>Encarregado do Abastecimento</strong>. O Programador já vem do seu login.</p>
+<figure><img src="img/18-documento-depois.png"><figcaption>Com a semana publicada, o botão de baixar é liberado.</figcaption></figure>
+
+<p>O PDF tem duas partes:</p>
+<ul>
+  <li><strong>Documento principal</strong> — resumo da semana, grade por CAM, dias sem separação, demandas com prazo e as observações do sistema. Termina com as áreas de assinatura.</li>
+  <li><strong>Anexo A</strong> — o detalhamento: o que será atendido em cada dia e por quê.</li>
+</ul>
+
+<div class="atencao"><b>A assinatura é digital, por token</b>As áreas de assinatura vêm em branco de propósito: o carimbo do certificado é aposto no próprio PDF, no assinador. Não imprima para assinar à mão.</div>
+
+<div class="aviso"><b>Publique antes de baixar</b>O PDF sai sempre da <strong>versão publicada</strong>, não do que está na tela. Se você mexeu na grade e não publicou, o sistema avisa — e o documento sairá com a versão anterior.</div>
+
+<h1 class="secao">10. Alterar no meio da semana</h1>
+<p>Surgiu demanda emergencial na quarta-feira? O procedimento é o mesmo de sempre: registre a demanda normalmente. O sistema refaz a grade e avisa que há mudanças não publicadas.</p>
+<figure><img src="img/19-versoes-pendente.png"><figcaption>O painel mostra o tamanho da mudança antes de você publicar.</figcaption></figure>
+
+<p>Ao publicar, a versão vira <strong>Alteração nº 1</strong> (depois nº 2, e assim por diante). O documento passa a trazer o <strong>Anexo B</strong>, que detalha:</p>
+<ul>
+  <li>A demanda que motivou a alteração</li>
+  <li>As RMs que entraram na grade e por quê</li>
+  <li>As RMs que saíram</li>
+  <li>As RMs que mudaram de dia, com a data de origem e a de destino</li>
+  <li>Mudanças nos dias de separação</li>
+</ul>
+
+<div class="dica"><b>Por que isso importa</b>Quem recebe a terceira versão da semana precisa saber o que mudou sem reler tudo. O Anexo B existe para isso.</div>
+
+<h1 class="secao">11. Acompanhar o andamento</h1>
+<p>A sub-aba <strong>Andamento</strong> compara o que foi publicado com o que o WMS mostra agora.</p>
+<figure><img src="img/20-andamento-topo.png"><figcaption>Quanto da programação foi cumprido.</figcaption></figure>
+<figure><img src="img/21-andamento-estados.png"><figcaption>Situação de cada RM programada. Clique num bloco para ver a lista e exportar.</figcaption></figure>
+
+<table>
+  <tr><th>Estado</th><th>Significa</th><th>Conta como cumprida?</th></tr>
+  <tr><td><strong>Não separada</strong></td><td>Continua na fila</td><td>Não</td></tr>
+  <tr><td><strong>Separada</strong></td><td>Conferida, entregue à Expedição</td><td>Sim</td></tr>
+  <tr><td><strong>Prontificada</strong></td><td>A Expedição já emitiu a STC ou GTC</td><td>Sim</td></tr>
+  <tr><td><strong>Expedida</strong></td><td>Saiu do depósito</td><td>Sim</td></tr>
+  <tr><td><strong>Cancelada</strong></td><td>Cancelada depois de programada</td><td>Não</td></tr>
+</table>
+
+<p>O cumprimento por CAM mostra onde a semana atrasou e também o que foi separado <strong>fora do plano</strong>:</p>
+<figure><img src="img/22-andamento-cam.png"><figcaption>Cumprimento por cliente, com a coluna do que foi feito fora da programação.</figcaption></figure>
+
+<h1 class="secao">12. O que fazer quando...</h1>
+
+<table>
+  <tr><th>Situação</th><th>O que fazer</th></tr>
+  <tr><td>A aba Programação pede login de novo</td><td>Normal após alguns dias. Basta entrar outra vez</td></tr>
+  <tr><td>Aparece "Banco não configurado"</td><td>Problema de configuração do site. Avise o administrador</td></tr>
+  <tr><td>Aparece "Não foi possível carregar a programação"</td><td>Verifique a internet e recarregue. Se persistir, avise o administrador</td></tr>
+  <tr><td>Aparece aviso vermelho de que não salvou</td><td>Recarregue a página para ver o que foi realmente gravado. Não continue trabalhando por cima</td></tr>
+  <tr><td>A grade mostra alerta vermelho de prazo</td><td>A demanda não cabe na capacidade até a data. Decida: ajustar capacidade, bloquear menos dias ou aceitar o atraso</td></tr>
+  <tr><td>Uma RM da mensagem aparece como "não encontrada"</td><td>Confira o número. Se estiver certo, a RM não chegou ao WMS — assunto para a origem da mensagem</td></tr>
+  <tr><td>Os dados do WMS estão velhos</td><td>Veja a data em "Última atualização" no topo. Se estiver atrasada, o problema é no robô que publica a planilha</td></tr>
+  <tr><td>Outro programador publicou e eu não vi</td><td>Recarregue a página. A lista de versões mostra quem publicou e quando</td></tr>
+</table>
+
+<div class="dica"><b>Regra de ouro</b>O sistema propõe; quem decide é você. Se a proposta não faz sentido para a realidade da semana, ajuste a capacidade, bloqueie dias ou registre a demanda que está faltando — e publique só quando a grade refletir o que vai acontecer de verdade.</div>
+
+</body></html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Documentação da Ferramenta</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .svgfig { text-align:center; margin: 4mm 0 3mm; page-break-inside: avoid; }
+  .num { font-variant-numeric: tabular-nums; }
+  td.certo { color:#047857; font-weight:700; } td.errado { color:#b91c1c; font-weight:700; }
+</style></head><body>
+
+<div class="capa">
+  <p class="om">Marinha do Brasil<strong>Depósito de Fardamento da Marinha no Rio de Janeiro</strong></p>
+  <div class="faixa"></div>
+  <h1>Documentação da Ferramenta</h1>
+  <p class="sub">Programação Semanal de Atendimento</p>
+  <p class="sub" style="font-size:10pt;color:#94a3b8;margin-top:6mm">Como o sistema funciona, o que ele calcula e por quê</p>
+  <p class="rodape">Documento de uso interno · Outubro de 2026</p>
+</div>
+
+<div class="sumario">
+  <h1 class="secao">Sumário</h1>
+  <ol>
+    <li>Objetivo e escopo</li>
+    <li>De onde vêm os dados</li>
+    <li>Conceitos do domínio</li>
+    <li>A fila de separação</li>
+    <li>Como a capacidade é medida</li>
+    <li>O motor de programação</li>
+    <li>O documento gerado</li>
+    <li>Versionamento e alterações</li>
+    <li>O acompanhamento</li>
+    <li>Arquitetura</li>
+    <li>Decisões assumidas e limitações</li>
+    <li>Glossário</li>
+  </ol>
+</div>
+
+<h1 class="secao">1. Objetivo e escopo</h1>
+<p>O módulo transforma uma decisão que era tomada de cabeça — <em>o que separar em cada dia da semana</em> — em uma proposta calculada, auditável e assinável.</p>
+
+<h2>O que ele faz</h2>
+<ul>
+  <li>Mede, no histórico do WMS, quanto o depósito entrega em cada dia da semana.</li>
+  <li>Monta a grade da semana atendendo primeiro as demandas com prazo e preenchendo o resto com as RMs mais antigas.</li>
+  <li>Explica cada alocação: por que aquela RM está naquele dia.</li>
+  <li>Gera o documento assinável, com anexo detalhando tudo.</li>
+  <li>Versiona alterações no meio da semana, registrando o que mudou.</li>
+  <li>Compara, depois, o planejado com o realizado.</li>
+</ul>
+
+<h2>O que ele não faz</h2>
+<ul>
+  <li><strong>Não decide sozinho.</strong> Quando a demanda com prazo não cabe, ele aponta o conflito em vez de escolher o que sacrificar.</li>
+  <li><strong>Não escreve no WMS.</strong> A leitura é de mão única; nada que se faz aqui altera o sistema de armazém.</li>
+  <li><strong>Não controla a Expedição.</strong> Ele enxerga a prontificação (a STC ou GTC no pedido), mas o processo de expedição é externo.</li>
+</ul>
+
+<h1 class="secao">2. De onde vêm os dados</h1>
+<p>O dashboard é uma página que lê arquivos publicados por robôs e um banco próprio. São três fontes:</p>
+<table>
+  <tr><th>Fonte</th><th>Conteúdo</th><th>Quem escreve</th></tr>
+  <tr><td><strong>Planilha do WMS</strong></td><td>Situação de cada RM: status, CAM, item, datas, documento</td><td>Robô, periodicamente</td></tr>
+  <tr><td><strong>Planilha do SINGRA</strong></td><td>Situação das RMs no sistema de suprimento</td><td>Robô, periodicamente</td></tr>
+  <tr><td><strong>Banco da programação</strong></td><td>Usuários, demandas, dias bloqueados, versões publicadas</td><td>Os programadores, pelo sistema</td></tr>
+</table>
+<p>A programação lê o WMS para saber o que está na fila e grava no banco próprio o que os programadores decidem. As duas coisas nunca se misturam: <strong>o WMS é a verdade sobre o estoque; o banco é a verdade sobre o planejamento</strong>.</p>
+
+<h1 class="secao">3. Conceitos do domínio</h1>
+
+<h2>RM, pedido e linha</h2>
+<p>Na planilha do WMS, a coluna <code>PEDIDO</code> guarda o <strong>número da RM</strong>, de 8 dígitos. Uma RM pode ter mais de uma linha, quando é atendida em liberações parciais — mas isso é raro: <strong>97,4% das RMs têm uma linha só</strong>. Para efeito de programação, a RM é tratada como uma unidade: ela está na fila se qualquer linha sua estiver.</p>
+
+<h2>CAM</h2>
+<p>A OM cliente que recebe o material. São 45 valores distintos na base. É a chave de leitura do documento final — a grade é publicada por CAM, não por item.</p>
+
+<h2>STC e GTC</h2>
+<p>Os dois tipos de documento de transporte convivem na mesma coluna da planilha, distinguidos pelo prefixo:</p>
+<table>
+  <tr><th>Tipo</th><th>O que é</th><th>Prazo adotado</th></tr>
+  <tr><td><strong>GTC</strong></td><td>Entrega local. A expedição depende só do depósito</td><td>10 dias</td></tr>
+  <tr><td><strong>STC</strong></td><td>Entrega em outro estado, transportada por outra OM</td><td>45 dias</td></tr>
+  <tr><td>Sem documento</td><td>Pedido que ainda não recebeu STC nem GTC</td><td>20 dias</td></tr>
+</table>
+<p>O prazo da STC é mais largo de propósito: a responsabilidade do depósito termina quando a STC é inserida no pedido, mas <strong>essa data não existe na planilha</strong> — só se enxerga a expedição. Os 45 dias compensam um tempo que não é possível medir separadamente.</p>
+
+<h2>Prontificação</h2>
+<p>É o momento em que a Expedição emite a STC ou a GTC. O sistema enxerga isso pela presença do documento no pedido. É o passo seguinte à separação, e o acompanhamento mostra os dois separadamente.</p>
+
+<h1 class="secao">4. A fila de separação</h1>
+<p>Esta definição é a mais importante do módulo, e também a mais fácil de errar.</p>
+
+<p>Uma RM sai da fila de separação quando chega a <strong>CONFERIDO</strong>. Nesse ponto ela está pronta e entregue à Expedição: o trabalho do depósito naquela RM acabou. É a mesma régua que define "atendido" para efeito de prazo.</p>
+
+<table>
+  <tr><th>Status no WMS</th><th>Está na fila de separação?</th></tr>
+  <tr><td>PLANEJAMENTO, RESERVADO, SEPARADO</td><td class="certo">Sim — ainda depende do depósito</td></tr>
+  <tr><td>CONFERIDO</td><td class="errado">Não — pronta, com a Expedição</td></tr>
+  <tr><td>EXPEDIDO</td><td class="errado">Não — saiu</td></tr>
+  <tr><td>CANCELADO</td><td class="errado">Não — não será atendida</td></tr>
+</table>
+
+<div class="atencao"><b>O erro que essa definição evita</b>Contar as conferidas como pendentes inflava a fila de <strong>757 para 2.487 RMs</strong> na base de 16/10/2026 — 1.730 RMs de trabalho que já não existia. Programá-las de novo seria contar duas vezes o mesmo serviço.</div>
+
+<p>Por isso o módulo chama a sua de <strong>"fila de separação"</strong>, e não de "fila em aberto". As outras abas do dashboard usam a definição mais ampla, que inclui as conferidas aguardando expedição — são perguntas diferentes, e os números divergem de propósito.</p>
+
+<h1 class="secao">5. Como a capacidade é medida</h1>
+<p>A capacidade de cada dia da semana sai do histórico: é a <strong>média de RMs distintas movimentadas naquele dia da semana</strong>, contando os dias parados como zero.</p>
+
+<h2>Medição de 16/10/2025 a 16/10/2026</h2>
+<table>
+  <tr><th>Dia</th><th>RMs/dia</th><th>% da semana</th></tr>
+  <tr><td>Segunda</td><td class="num">93</td><td class="num">22%</td></tr>
+  <tr><td>Terça</td><td class="num">106</td><td class="num">25%</td></tr>
+  <tr><td>Quarta</td><td class="num">90</td><td class="num">21%</td></tr>
+  <tr><td>Quinta</td><td class="num">98</td><td class="num">23%</td></tr>
+  <tr><td><strong>Sexta</strong></td><td class="num"><strong>42</strong></td><td class="num"><strong>10%</strong></td></tr>
+  <tr><td colspan="2"><strong>Capacidade semanal</strong></td><td class="num"><strong>429 RMs</strong></td></tr>
+</table>
+<p>A sexta-feira vale menos da metade de um dia normal. Isso não é hipótese: é o que a operação entrega às sextas, confirmado em todos os recortes testados.</p>
+
+<h2>Por que média e não mediana</h2>
+<p>A escolha parece detalhe técnico, mas muda o planejamento em um terço. A operação trabalha em <strong>batelada</strong>: há segundas com centenas de RMs e segundas com nenhuma.</p>
+<table>
+  <tr><th>Critério</th><th>Capacidade semanal</th><th>Efeito</th></tr>
+  <tr><td>Mediana de cada dia</td><td class="num">~275 RMs</td><td class="errado">Subprograma a semana em mais de 30%</td></tr>
+  <tr><td><strong>Média de cada dia</strong></td><td class="num"><strong>429 RMs</strong></td><td class="certo">Reproduz a vazão real</td></tr>
+</table>
+<p>A mediana descreveria o "dia típico", mas a soma dos dias típicos não é a semana típica quando a distribuição é tão assimétrica. A média, testada em janelas de 12 semanas e de 12 meses, manteve a mesma forma — segunda a quinta parecidas, sexta na metade.</p>
+
+<div class="aviso"><b>A ressalva honesta</b>O que a planilha permite medir é a <strong>expedição</strong>, não a separação: o WMS não registra quando a RM foi conferida depois que ela é expedida. Em regime estável o que entra é o que sai, então a vazão de expedição serve como aproximação da capacidade de separação. É por isso que todo dia pode ser ajustado na mão — o número medido é ponto de partida, não ordem.</div>
+
+<h1 class="secao">6. O motor de programação</h1>
+<p>Duas filas disputam a mesma capacidade, nesta ordem:</p>
+
+<h2>Fila 1 — demandas com prazo</h2>
+<p>Agendadas <strong>de trás para frente</strong> a partir do prazo. O prazo cobrado é de emissão da STC, não de separação; então a separação precisa terminar antes, para a Expedição ter tempo de prontificar.</p>
+
+<div class="svgfig">
+<svg width="470" height="150" viewBox="0 0 470 150" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .lbl{font:9px Helvetica,Arial;fill:#475569}.lblb{font:bold 9px Helvetica,Arial;fill:#0f172a}
+    .cap{font:bold 8px Helvetica,Arial;fill:#64748b}
+  </style>
+  <rect x="10" y="40" width="80" height="34" rx="4" fill="#1e3a8a"/>
+  <rect x="94" y="40" width="80" height="34" rx="4" fill="#1e3a8a"/>
+  <rect x="178" y="40" width="80" height="34" rx="4" fill="#1e3a8a" opacity=".45"/>
+  <rect x="262" y="40" width="80" height="34" rx="4" fill="#cbd5e1"/>
+  <rect x="346" y="40" width="80" height="34" rx="4" fill="#cbd5e1"/>
+  <text x="50" y="61" class="lblb" fill="#fff" text-anchor="middle">SEG</text>
+  <text x="134" y="61" class="lblb" fill="#fff" text-anchor="middle">TER</text>
+  <text x="218" y="61" class="lblb" fill="#fff" text-anchor="middle">QUA</text>
+  <text x="302" y="61" class="lblb" text-anchor="middle">QUI</text>
+  <text x="386" y="61" class="lblb" text-anchor="middle">SEX</text>
+  <text x="134" y="30" class="cap" text-anchor="middle">SEPARAÇÃO</text>
+  <line x1="10" y1="34" x2="258" y2="34" stroke="#1e3a8a" stroke-width="1.5"/>
+  <text x="344" y="30" class="cap" text-anchor="middle">EXPEDIÇÃO (3 dias úteis)</text>
+  <line x1="262" y1="34" x2="426" y2="34" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="218" y="92" class="lbl" text-anchor="middle">↑ separação tem que terminar aqui</text>
+  <text x="426" y="92" class="lbl" text-anchor="end">↑ prazo da mensagem (EMI STC)</text>
+  <text x="10" y="122" class="lbl">O motor preenche do dia mais cedo para o mais tarde, para sobrar folga no fim.</text>
+  <text x="10" y="136" class="lbl">Se não couber até a data limite, ele avisa em vez de empurrar o prazo.</text>
+</svg>
+</div>
+
+<h2>Fila 2 — antiguidade</h2>
+<p>O que sobrar da capacidade de cada dia é preenchido com as RMs mais antigas da fila, da mais velha para a mais nova. É o princípio padrão quando não há prazo externo mandando.</p>
+
+<h2>Dias sem separação</h2>
+<p>Um dia bloqueado tem a capacidade zerada e o motor redistribui o trabalho pelos demais. O motivo informado sai impresso no documento — é o que justifica a semana mais curta para quem lê.</p>
+
+<h2>Quando não cabe</h2>
+<p>O motor <strong>não escolhe o que sacrificar</strong>. Ele aloca o que couber e devolve o conflito em alerta vermelho, informando quantas RMs ficaram de fora e até quando teriam que ser separadas. A decisão — ampliar capacidade, desbloquear um dia ou aceitar o atraso — é do programador.</p>
+
+<div class="dica"><b>O efeito cascata é visível</b>Numa validação real, uma demanda emergencial de 40 RMs deslocou 200: 40 entraram, 40 saíram e 160 mudaram de dia. O sistema mostra isso antes de publicar, para a decisão ser tomada com o custo à vista.</div>
+
+<h1 class="secao">7. O documento gerado</h1>
+<p>Sai em PDF A4, pronto para assinatura digital por certificado em token.</p>
+
+<h2>Documento principal</h2>
+<ol>
+  <li><strong>Resumo da semana</strong> — totais, ocupação e a composição entre prazo e antiguidade</li>
+  <li><strong>Grade de atendimento por CAM</strong> — a tabela central: cada cliente, cada dia, os totais</li>
+  <li><strong>Dias sem separação</strong> — datas e motivos</li>
+  <li><strong>Demandas com prazo</strong> — origem, referência, RMs informadas, prazo e data limite de separação</li>
+  <li><strong>Observações</strong> — os conflitos que o motor identificou</li>
+</ol>
+<p>Fecha com as áreas de assinatura do Programador do DepFMRJ e do Encarregado do Abastecimento.</p>
+
+<div class="atencao"><b>Por que a área de assinatura vem em branco</b>O DepFMRJ assina com certificado em token, no próprio PDF. O documento oferece um retângulo limpo onde o carimbo cabe, com a identificação abaixo — não uma linha para assinar à mão.</div>
+
+<h2>Anexo A — detalhamento</h2>
+<p>Por dia, o que será atendido e por quê. RMs de mesma origem e mesmo CAM saem agrupadas numa linha, com os números listados. Na fila por antiguidade, o bloco resume a faixa de espera em vez de repetir a justificativa RM a RM.</p>
+
+<h2>Anexo B — alterações</h2>
+<p>Presente da segunda versão em diante. Traz o que mudou em relação à versão anterior: a demanda que motivou, as RMs que entraram, as que saíram, as que mudaram de dia (agrupadas por trajeto) e as mudanças nos dias de separação.</p>
+
+<div class="aviso"><b>Limitação conhecida: o PDF é imagem</b>O documento é desenhado e convertido em imagem, então <strong>não tem texto selecionável</strong>. Para a assinatura com token isso não é problema — o certificado assina o arquivo, não o texto. Mas o PDF não permite busca nem cópia de texto, e não serve se algum sistema de arquivo exigir PDF pesquisável.</div>
+
+<h1 class="secao">8. Versionamento e alterações</h1>
+<p>Publicar congela uma fotografia completa da semana no banco: a grade inteira, RM por RM, com dia, CAM e justificativa.</p>
+<ul>
+  <li>A primeira publicação da semana é a <strong>Original</strong>.</li>
+  <li>Cada publicação seguinte é uma <strong>Alteração numerada</strong>.</li>
+  <li>O que já foi publicado <strong>não muda</strong>. Versões antigas continuam consultáveis como foram.</li>
+  <li>O PDF sai sempre da versão publicada, nunca do que está na tela — senão o documento impresso poderia divergir do que foi publicado.</li>
+</ul>
+<p>Enquanto a grade na tela diferir da última versão publicada, o sistema mostra o tamanho da diferença: quantas RMs entrariam, sairiam e mudariam de dia.</p>
+
+<h1 class="secao">9. O acompanhamento</h1>
+<p>Compara a versão publicada com o que o WMS mostra no momento da consulta.</p>
+
+<div class="dica"><b>Por que não lê o PDF</b>Cogitou-se carregar o PDF gerado para extrair as RMs. Não seria confiável: o PDF é imagem, e lê-lo exigiria reconhecimento óptico, que erraria dígitos justamente num número de RM — um dígito errado é outra RM. A versão publicada já está inteira no banco; ler de lá é exato.</div>
+
+<table>
+  <tr><th>Estado</th><th>Critério no WMS</th><th>Conta como cumprida</th></tr>
+  <tr><td><strong>Não separada</strong></td><td>Ainda em PLANEJAMENTO, RESERVADO ou SEPARADO</td><td class="errado">Não</td></tr>
+  <tr><td><strong>Separada</strong></td><td>CONFERIDO, sem documento</td><td class="certo">Sim</td></tr>
+  <tr><td><strong>Prontificada</strong></td><td>CONFERIDO, com STC ou GTC no pedido</td><td class="certo">Sim</td></tr>
+  <tr><td><strong>Expedida</strong></td><td>EXPEDIDO</td><td class="certo">Sim</td></tr>
+  <tr><td><strong>Cancelada</strong></td><td>CANCELADO após a publicação</td><td class="errado">Não</td></tr>
+</table>
+
+<p>O painel também mostra o que foi <strong>separado fora da programação</strong>: RMs trabalhadas dentro da semana sem constar na grade publicada.</p>
+
+<div class="aviso"><b>Aproximação declarada</b>O WMS não guarda a data em que a RM foi conferida depois que ela é expedida. Uma RM separada nesta semana e expedida na seguinte aparece na semana seguinte. O número serve como indicador de desvio, não como número contábil.</div>
+
+<h1 class="secao">10. Arquitetura</h1>
+<table>
+  <tr><th>Camada</th><th>Tecnologia</th><th>Função</th></tr>
+  <tr><td>Site</td><td>Página estática (React), hospedada na Vercel</td><td>Toda a interface e todo o cálculo</td></tr>
+  <tr><td>Dados do estoque</td><td>Planilhas publicadas em armazenamento na nuvem</td><td>Leitura do WMS e do SINGRA</td></tr>
+  <tr><td>Banco da programação</td><td>Supabase (PostgreSQL)</td><td>Usuários, demandas, bloqueios, versões</td></tr>
+  <tr><td>Código</td><td>GitHub</td><td>Fonte; publica sozinho a cada envio</td></tr>
+</table>
+
+<p>Não existe servidor próprio: <strong>o cálculo inteiro roda no navegador</strong>. O motor de programação, a medição de capacidade e a geração do documento são código que executa na máquina de quem abriu a página. O banco guarda apenas decisões — nunca resultados calculados que possam ficar desatualizados.</p>
+
+<h2>Controle de acesso</h2>
+<p>Quem não está autenticado não lê nada da programação. A proteção está nas regras do banco, não no segredo da chave que o site carrega — essa chave é pública por desenho e serve apenas para identificar o projeto.</p>
+
+<h2>Verificação diária</h2>
+<p>O plano gratuito do banco hiberna após cerca de uma semana sem acesso. Uma rotina automática lê uma linha do banco todo dia, o que basta para mantê-lo ativo. Detalhes e manutenção no documento de administração.</p>
+
+<h1 class="secao">11. Decisões assumidas e limitações</h1>
+<p>Toda decisão abaixo foi tomada conscientemente e pode ser revista.</p>
+
+<table>
+  <tr><th>Decisão</th><th>Razão</th><th>Custo aceito</th></tr>
+  <tr><td>Capacidade pela média, não pela mediana</td><td>A operação é em batelada; a mediana subprograma em 30%</td><td>Dias atípicos puxam o número para cima</td></tr>
+  <tr><td>Capacidade medida na expedição</td><td>O WMS não registra a data de conferência das RMs já expedidas</td><td>Aproximação; por isso é ajustável na mão</td></tr>
+  <tr><td>Contagem em RMs, não em itens</td><td>97,4% das RMs têm uma linha só</td><td>Uma RM de 2 peças pesa igual a uma de 1.200</td></tr>
+  <tr><td>Prazo de STC em 45 dias</td><td>A data de inserção da STC não existe na planilha</td><td>Prazo largo que compensa tempo não medido</td></tr>
+  <tr><td>Documento em PDF de imagem</td><td>Preserva o acabamento visual do documento</td><td>Sem texto selecionável ou pesquisável</td></tr>
+  <tr><td>Demandas valem para qualquer semana</td><td>Uma demanda com prazo pode atravessar semanas</td><td>Demanda vencida precisa ser removida à mão</td></tr>
+  <tr><td>Todos os programadores têm o mesmo poder</td><td>Os três se revezam no mesmo trabalho</td><td>Não há aprovação em dois níveis no sistema</td></tr>
+</table>
+
+<h2>Melhorias possíveis</h2>
+<ul>
+  <li><strong>Medir o tempo até CONFERIDO.</strong> Guardando uma fotografia diária dos status, em alguns meses passa a existir o dado que hoje falta — e a capacidade deixaria de ser aproximação.</li>
+  <li><strong>Segundo limite por volume.</strong> Um teto em peças por dia, além do teto em RMs, se a contagem por RM se mostrar grosseira demais.</li>
+  <li><strong>Baixa automática de demandas vencidas.</strong></li>
+</ul>
+
+<h1 class="secao">12. Glossário</h1>
+<table>
+  <tr><th>Termo</th><th>Significado</th></tr>
+  <tr><td><strong>RM</strong></td><td>Requisição de Material. Número de 8 dígitos; a unidade de planejamento</td></tr>
+  <tr><td><strong>CAM</strong></td><td>A OM cliente que recebe o material</td></tr>
+  <tr><td><strong>STC</strong></td><td>Documento de transporte para outro estado, levado por outra OM</td></tr>
+  <tr><td><strong>GTC</strong></td><td>Documento de transporte para entrega local, feita pelo depósito</td></tr>
+  <tr><td><strong>Conferido</strong></td><td>Status do WMS em que a separação termina e a RM passa à Expedição</td></tr>
+  <tr><td><strong>Prontificação</strong></td><td>Emissão da STC ou GTC pela Expedição</td></tr>
+  <tr><td><strong>Fila de separação</strong></td><td>RMs que ainda dependem de trabalho do depósito</td></tr>
+  <tr><td><strong>Capacidade</strong></td><td>Quantas RMs o depósito movimenta num dia daquele dia da semana</td></tr>
+  <tr><td><strong>Versão</strong></td><td>Fotografia congelada da programação publicada</td></tr>
+  <tr><td><strong>Original / Alteração</strong></td><td>Primeira publicação da semana / publicações seguintes</td></tr>
+</table>
+
+</body></html>
