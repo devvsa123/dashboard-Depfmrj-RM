@@ -180,7 +180,15 @@ A rotina precisa de dois segredos cadastrados no repositório. Sem eles,
 ela falha todo dia com a mensagem dizendo exatamente isso.
 
 GitHub → repositório → **Settings** → **Secrets and variables** →
-**Actions** → **New repository secret**:
+**Actions** → aba **Secrets** → role até a seção **Repository secrets** →
+**New repository secret**:
+
+> **Cuidado com a seção errada.** Essa mesma tela tem *Environment
+> secrets* logo acima. Se você clicar ali, o GitHub cria um *ambiente*
+> com o nome que você digitou e guarda o segredo dentro dele — e o
+> workflow não enxerga, porque não declara ambiente nenhum. Tem que ser
+> **Repository secrets**.
+
 
 | Nome | Valor |
 |---|---|

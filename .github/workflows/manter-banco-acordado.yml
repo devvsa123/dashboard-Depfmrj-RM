@@ -28,7 +28,7 @@ jobs:
         run: |
           set -u
           if [ -z "${URL:-}" ] || [ -z "${KEY:-}" ]; then
-            echo "::error::Faltam os segredos do repositório. Vá em Settings → Secrets and variables → Actions e cadastre SUPABASE_URL e SUPABASE_ANON_KEY."
+            echo "::error::Faltam os segredos. Vá em Settings → Secrets and variables → Actions, aba Secrets, e cadastre SUPABASE_URL e SUPABASE_ANON_KEY na seção REPOSITORY SECRETS (botão 'New repository secret'). Cuidado: a mesma tela tem 'Environment secrets' logo acima, e segredo cadastrado ali não chega neste workflow."
             exit 1
           fi
 
