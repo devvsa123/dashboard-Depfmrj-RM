@@ -123,6 +123,22 @@ const ProgramacaoTab = (p) => {
     {p.resultado && <GradeSemanal resultado={p.resultado} />}
 
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <DemandasPanel demandas={p.demandas} adicionarDemanda={p.adicionarDemanda} removerDemanda={p.removerDemanda} />
+      <div className="space-y-6">
+        <CapacidadePanel
+          capacidade={p.capacidadeMedida}
+          janelaDias={p.janelaDias}
+          setJanelaDias={p.setJanelaDias}
+          janelas={p.janelas}
+          grade={p.resultado?.grade || []}
+          overrides={p.overrides}
+          definirOverride={p.definirOverride}
+        />
+        <BloqueiosPanel bloqueios={p.bloqueios} adicionarBloqueio={p.adicionarBloqueio} removerBloqueio={p.removerBloqueio} />
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <VersoesPanel
         versoes={p.versoes}
         ultimaVersao={p.ultimaVersao}
@@ -141,22 +157,6 @@ const ProgramacaoTab = (p) => {
         encarregado={p.encarregado}
         setEncarregado={p.setEncarregado}
       />
-    </div>
-
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-      <DemandasPanel demandas={p.demandas} adicionarDemanda={p.adicionarDemanda} removerDemanda={p.removerDemanda} />
-      <div className="space-y-6">
-        <CapacidadePanel
-          capacidade={p.capacidadeMedida}
-          janelaDias={p.janelaDias}
-          setJanelaDias={p.setJanelaDias}
-          janelas={p.janelas}
-          grade={p.resultado?.grade || []}
-          overrides={p.overrides}
-          definirOverride={p.definirOverride}
-        />
-        <BloqueiosPanel bloqueios={p.bloqueios} adicionarBloqueio={p.adicionarBloqueio} removerBloqueio={p.removerBloqueio} />
-      </div>
     </div>
     </>
     )}
