@@ -196,7 +196,7 @@ const App = () => {
             />
           ) : activeTab === 'programacao' ? (
             <LoginGate auth={auth}>
-              <ProgramacaoTab {...programacao} auth={auth} />
+              <ProgramacaoTab {...programacao} auth={auth} handleDownloadExcel={downloadExcel} />
             </LoginGate>
           ) : activeTab === 'email' ? (
             <EmailSearchTab

@@ -5,6 +5,7 @@ import CapacidadePanel from './CapacidadePanel';
 import DemandasPanel from './DemandasPanel';
 import GradeSemanal from './GradeSemanal';
 import DocumentoCard from './DocumentoCard';
+import AcompanhamentoPanel from './AcompanhamentoPanel';
 import VersoesPanel from './VersoesPanel';
 import { rotuloSemana, somaDias, segundaDaSemana, formatarBr } from '../../utils/programacao/semana';
 
@@ -44,7 +45,14 @@ const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
 // Módulo de programação semanal. O programador valida uma proposta: o
 // sistema monta, explica cada alocação e aponta os conflitos; a decisão
 // continua sendo dele.
-const ProgramacaoTab = (p) => (
+const SUBABAS = [
+  { key: 'montagem', label: 'Montar a semana' },
+  { key: 'andamento', label: 'Andamento' }
+];
+
+const ProgramacaoTab = (p) => {
+  const [subaba, setSubaba] = useState('montagem');
+  return (
   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
     <div className="flex items-center justify-between gap-3 flex-wrap">
       <SectionLabel title="Programação Semanal" description="Proposta de grade de atendimento — o programador valida, ajusta e publica" />
@@ -72,6 +80,18 @@ const ProgramacaoTab = (p) => (
       </div>
     )}
 
+    <div className="flex p-1 bg-white rounded-2xl border border-slate-200 w-fit shadow-sm">
+      {SUBABAS.map(s => (
+        <button
+          key={s.key}
+          onClick={() => setSubaba(s.key)}
+          className={`px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${subaba === s.key ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <CalendarRange className="text-indigo-500" size={20} />
@@ -89,6 +109,17 @@ const ProgramacaoTab = (p) => (
       </div>
     </div>
 
+    {subaba === 'andamento' ? (
+      <AcompanhamentoPanel
+        versoes={p.versoes}
+        semanaRef={p.semanaRef}
+        indiceWms={p.indiceWms}
+        diffPendente={p.diffPendente}
+        publicar={p.publicar}
+        handleDownloadExcel={p.handleDownloadExcel}
+      />
+    ) : (
+    <>
     {p.resultado && <GradeSemanal resultado={p.resultado} />}
 
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -127,7 +158,10 @@ const ProgramacaoTab = (p) => (
         <BloqueiosPanel bloqueios={p.bloqueios} adicionarBloqueio={p.adicionarBloqueio} removerBloqueio={p.removerBloqueio} />
       </div>
     </div>
+    </>
+    )}
   </div>
-);
+  );
+};
 
 export default ProgramacaoTab;

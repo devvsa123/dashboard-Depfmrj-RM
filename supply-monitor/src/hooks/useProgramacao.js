@@ -210,7 +210,7 @@ export const useProgramacao = (data, auth) => {
     overrides, definirOverride,
     janelaDias, setJanelaDias: mudarJanela, janelas: JANELAS,
     programador: auth?.nome || '', encarregado, setEncarregado: mudarEncarregado,
-    capacidadeMedida, fila, resultado,
+    capacidadeMedida, fila, resultado, indiceWms,
     carregando, salvando: salvando > 0, erroSync
   };
 };

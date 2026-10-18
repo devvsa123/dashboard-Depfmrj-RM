@@ -106,6 +106,10 @@ export const indexarWms = (data) => {
         documento: String(item.STC || '').trim(),
         tipoRm: String(item.TIPO_RM || '').trim(),
         entrada,
+        // Em linha CONFERIDA esta data é a da própria conferência; em
+        // linha EXPEDIDA, a da expedição. O acompanhamento usa isso para
+        // saber em que semana o trabalho aconteceu.
+        movimento: safeGetISODate(item.DATA_SEPARACAO),
         linhas: 1
       });
       return;
@@ -113,6 +117,9 @@ export const indexarWms = (data) => {
     atual.linhas++;
     if (entrada && (!atual.entrada || entrada < atual.entrada)) atual.entrada = entrada;
     if (estaNaFila(situacao) && !estaNaFila(atual.situacao)) atual.situacao = situacao;
+    if (!atual.documento && item.STC) atual.documento = String(item.STC).trim();
+    const mov = safeGetISODate(item.DATA_SEPARACAO);
+    if (mov && (!atual.movimento || mov > atual.movimento)) atual.movimento = mov;
   });
   return indice;
 };
