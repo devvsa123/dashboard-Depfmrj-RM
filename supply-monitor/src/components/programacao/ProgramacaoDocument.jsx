@@ -198,8 +198,8 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
           <Titulo numero={bloqueios.length > 0 ? '4' : '3'} texto="Demandas com Prazo" />
           <Tabela
             colunas={[
-              { key: 'ref', label: 'Origem / Referência', width: '40%', emphasis: true },
-              { key: 'rms', label: 'RMs', width: '12%', align: 'center' },
+              { key: 'ref', label: 'Origem / Referência', width: '36%', emphasis: true },
+              { key: 'rms', label: 'RMs informadas', width: '16%', align: 'center' },
               { key: 'prazo', label: 'Prazo', width: '16%', align: 'center' },
               { key: 'limite', label: 'Separar até', width: '16%', align: 'center' },
               { key: 'exp', label: 'Dias exped.', width: '16%', align: 'center' }
@@ -314,8 +314,8 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
               <div className="h-px bg-slate-300" style={{ marginBottom: 8 }} />
               <Tabela
                 colunas={[
-                  { key: 'ref', label: 'Origem / Referência', width: '48%', emphasis: true },
-                  { key: 'rms', label: 'RMs', width: '14%', align: 'center' },
+                  { key: 'ref', label: 'Origem / Referência', width: '44%', emphasis: true },
+                  { key: 'rms', label: 'RMs informadas', width: '18%', align: 'center' },
                   { key: 'prazo', label: 'Prazo', width: '19%', align: 'center' },
                   { key: 'limite', label: 'Separar até', width: '19%', align: 'center' }
                 ]}

@@ -39,7 +39,12 @@ export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
       referencia: d.referencia,
       prazo: d.prazo,
       diasExpedicao: d.diasExpedicao,
-      qtd: d.rmsEmFila.length
+      // O total que a origem informou, e não o que sobrou para programar:
+      // a mensagem cobra o lote inteiro, mesmo que parte já tenha saído. O
+      // quanto foi cumprido é assunto do acompanhamento, não da
+      // programação da semana.
+      qtd: (d.rms || []).length,
+      qtdNaSemana: d.rmsEmFila.length
     }))
 });
 
