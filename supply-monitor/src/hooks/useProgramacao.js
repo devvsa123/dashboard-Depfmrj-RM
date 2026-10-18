@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { medirCapacidade, indexarWms, filaPorAntiguidade, JANELAS } from '../utils/programacao/capacidade';
 import { programarSemana, DIAS_EXPEDICAO_PADRAO, ORIGENS } from '../utils/programacao/motor';
 import { extrairRms, conferirRms } from '../utils/programacao/rms';
+import { montarSnapshot, compararVersoes } from '../utils/programacao/versoes';
 import { hojeIso, segundaDaSemana, somaDias } from '../utils/programacao/semana';
 
 const CHAVE = 'depfmrj.programacao.v1';
@@ -26,12 +27,16 @@ export const useProgramacao = (data) => {
   const [janelaDias, setJanelaDias] = useState(() => inicial.janelaDias || 365);
   const [programador, setProgramador] = useState(() => inicial.programador || '');
   const [encarregado, setEncarregado] = useState(() => inicial.encarregado || '');
+  // Versões publicadas, por semana. Publicar congela a fotografia daquela
+  // semana; a próxima publicação vira uma alteração e o documento compara
+  // as duas.
+  const [versoesPorSemana, setVersoesPorSemana] = useState(() => inicial.versoesPorSemana || {});
 
   useEffect(() => {
     try {
-      localStorage.setItem(CHAVE, JSON.stringify({ semanaRef, demandas, bloqueios, overrides, janelaDias, programador, encarregado }));
+      localStorage.setItem(CHAVE, JSON.stringify({ semanaRef, demandas, bloqueios, overrides, janelaDias, programador, encarregado, versoesPorSemana }));
     } catch { /* cota cheia ou modo privado: a programação segue na memória */ }
-  }, [semanaRef, demandas, bloqueios, overrides, janelaDias, programador, encarregado]);
+  }, [semanaRef, demandas, bloqueios, overrides, janelaDias, programador, encarregado, versoesPorSemana]);
 
   const indiceWms = useMemo(() => indexarWms(data), [data]);
   const capacidadeMedida = useMemo(() => medirCapacidade(data, janelaDias), [data, janelaDias]);
@@ -92,7 +97,44 @@ export const useProgramacao = (data) => {
     });
   }, []);
 
+  const versoes = useMemo(() => versoesPorSemana[semanaRef] || [], [versoesPorSemana, semanaRef]);
+  const ultimaVersao = versoes.length ? versoes[versoes.length - 1] : null;
+
+  // A fotografia que sairia se publicássemos agora, e o que ela mudaria em
+  // relação à última publicada. É o que o painel mostra como pendente.
+  const snapshotAtual = useMemo(
+    () => (resultado ? montarSnapshot({ resultado, bloqueios, demandas: demandasConferidas }) : null),
+    [resultado, bloqueios, demandasConferidas]
+  );
+
+  const diffPendente = useMemo(
+    () => (ultimaVersao && snapshotAtual ? compararVersoes(ultimaVersao.snapshot, snapshotAtual) : null),
+    [ultimaVersao, snapshotAtual]
+  );
+
+  const publicar = useCallback((por) => {
+    if (!snapshotAtual) return null;
+    const numero = versoes.length;
+    const nova = {
+      numero,
+      publicadaEm: new Date().toISOString(),
+      por: por || '',
+      snapshot: snapshotAtual
+    };
+    setVersoesPorSemana(atual => ({ ...atual, [semanaRef]: [...(atual[semanaRef] || []), nova] }));
+    return nova;
+  }, [snapshotAtual, versoes.length, semanaRef]);
+
+  const removerUltimaVersao = useCallback(() => {
+    setVersoesPorSemana(atual => {
+      const lista = atual[semanaRef] || [];
+      if (!lista.length) return atual;
+      return { ...atual, [semanaRef]: lista.slice(0, -1) };
+    });
+  }, [semanaRef]);
+
   return {
+    versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao,
     semanaRef, setSemanaRef,
     demandas: demandasConferidas, adicionarDemanda, removerDemanda,
     bloqueios, adicionarBloqueio, removerBloqueio,

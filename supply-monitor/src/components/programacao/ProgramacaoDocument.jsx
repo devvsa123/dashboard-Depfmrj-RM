@@ -1,6 +1,7 @@
 import { forwardRef, Fragment } from 'react';
 import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana } from '../../utils/programacao/semana';
 import { ORIGENS, limiteDeSeparacao } from '../../utils/programacao/motor';
+import { agruparParaAnexo } from '../../utils/programacao/versoes';
 
 // -----------------------------------------------------------------------
 // Documento estático da programação semanal. Como o relatório mensal, não
@@ -26,13 +27,18 @@ const Secao = ({ children, quebravel }) => (
   <div style={{ breakInside: quebravel ? 'auto' : 'avoid', paddingTop: 5, marginBottom: 15 }}>{children}</div>
 );
 
+// O número vai no próprio texto do título, e não numa caixinha colorida.
+// No navegador qualquer centralização funciona, mas o html2canvas — que
+// desenha a página para virar PDF — posiciona o texto pela linha de base e
+// ignora line-height, text-align vertical e alinhamento de flex, deixando
+// o número encostado no canto da caixa. Sem caixa, não há o que
+// desalinhar.
 const Titulo = ({ numero, texto }) => (
   <div style={{ marginBottom: 9, breakAfter: 'avoid' }}>
-    <div className="flex items-center gap-2.5">
-      <span style={{ background: '#1e3a8a', color: '#fff', width: 22, height: 22, borderRadius: 5, textAlign: 'center', lineHeight: '22px' }} className="text-xs font-black">{numero}</span>
-      <h2 className="text-sm font-black text-slate-900 uppercase tracking-wide">{texto}</h2>
-    </div>
-    <div className="h-px bg-slate-300 mt-2.5" />
+    <h2 className="text-sm font-black uppercase tracking-wide" style={{ color: '#0f172a' }}>
+      <span style={{ color: '#1e3a8a' }}>{numero}.</span> {texto}
+    </h2>
+    <div className="h-px bg-slate-300" style={{ marginTop: 5 }} />
   </div>
 );
 
@@ -91,9 +97,9 @@ const Assinaturas = ({ programador, encarregado }) => (
   </div>
 );
 
-const ProgramacaoDocument = forwardRef(({ resultado, semanaRef, demandas, bloqueios, programador, encarregado, versao, emitidoEm }, ref) => {
-  if (!resultado) return <div ref={ref} />;
-  const { grade, porCam, resumo, alertas } = resultado;
+const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador, encarregado, versao, emitidoEm }, ref) => {
+  if (!snapshot) return <div ref={ref} />;
+  const { grade, porCam, resumo, alertas, bloqueios } = snapshot;
 
   // Grade por CAM: 5 dias + CAM + total. As larguras somam exatamente 100%.
   const colsCam = [
@@ -112,7 +118,7 @@ const ProgramacaoDocument = forwardRef(({ resultado, semanaRef, demandas, bloque
     total: resumo.totalProgramado
   };
 
-  const comPrazo = demandas.filter(d => d.prazo && d.rmsEmFila?.length);
+  const comPrazo = snapshot.demandas || [];
 
   // Anexo: agrupa por dia, depois por origem e CAM. Listar 400 linhas uma a
   // uma não se lê; agrupado, cada linha já traz o porquê de todas as RMs
@@ -154,9 +160,9 @@ const ProgramacaoDocument = forwardRef(({ resultado, semanaRef, demandas, bloque
             { r: 'Com prazo', v: resumo.comPrazo },
             { r: 'CAMs atendidos', v: resumo.camsAtendidos }
           ].map(c => (
-            <div key={c.r} style={{ flex: '1 1 0', minWidth: 0, border: '1px solid #cbd5e1', borderRadius: 5, padding: '6px 9px' }}>
+            <div key={c.r} style={{ flex: '1 1 0', minWidth: 0, border: '1px solid #cbd5e1', borderRadius: 5, padding: '7px 9px', textAlign: 'center' }}>
               <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wide">{c.r}</p>
-              <p className="text-base font-black text-slate-900" style={{ lineHeight: '20px' }}>{c.v}</p>
+              <p className="text-base font-black text-slate-900" style={{ lineHeight: '20px', marginTop: 2 }}>{c.v}</p>
             </div>
           ))}
         </div>
@@ -200,7 +206,7 @@ const ProgramacaoDocument = forwardRef(({ resultado, semanaRef, demandas, bloque
             ]}
             linhas={comPrazo.map(d => ({
               ref: `${ORIGEM_LABEL[d.origem] || d.origem}${d.referencia ? ` — ${d.referencia}` : ''}`,
-              rms: d.rmsEmFila.length,
+              rms: d.qtd,
               prazo: formatarBr(d.prazo),
               limite: formatarBr(limiteDeSeparacao(d.prazo, d.diasExpedicao)),
               exp: `${d.diasExpedicao} úteis`
@@ -276,6 +282,119 @@ const ProgramacaoDocument = forwardRef(({ resultado, semanaRef, demandas, bloque
           </div>
         ))}
       </div>
+
+      {/* ───────────────── ANEXO B ───────────────── */}
+      {diff && (
+        <div style={{ breakBefore: 'page', paddingTop: 10 }}>
+          <div style={{ textAlign: 'center', marginBottom: 18 }}>
+            <h1 className="text-base font-black text-slate-900 uppercase tracking-wide">Anexo B — Alterações desta Versão</h1>
+            <p className="text-[10px] text-slate-500" style={{ marginTop: 3 }}>
+              {versao} · o que mudou em relação à versão anterior · emitido em {emitidoEm}
+            </p>
+            <div className="h-0.5 bg-slate-800" style={{ marginTop: 12 }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+            {[
+              { r: 'RMs incluídas', v: diff.entraram.length },
+              { r: 'RMs retiradas', v: diff.sairam.length },
+              { r: 'RMs remanejadas', v: diff.remanejadas.length },
+              { r: 'Saldo programado', v: `${diff.deltaProgramado > 0 ? '+' : ''}${diff.deltaProgramado}` }
+            ].map(c => (
+              <div key={c.r} style={{ flex: '1 1 0', minWidth: 0, border: '1px solid #cbd5e1', borderRadius: 5, padding: '7px 9px', textAlign: 'center' }}>
+                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wide">{c.r}</p>
+                <p className="text-base font-black text-slate-900" style={{ lineHeight: '20px', marginTop: 2 }}>{c.v}</p>
+              </div>
+            ))}
+          </div>
+
+          {diff.demandasNovas.length > 0 && (
+            <div style={{ breakInside: 'avoid', marginBottom: 16 }}>
+              <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 5 }}>Demandas que motivaram a alteração</p>
+              <div className="h-px bg-slate-300" style={{ marginBottom: 8 }} />
+              <Tabela
+                colunas={[
+                  { key: 'ref', label: 'Origem / Referência', width: '48%', emphasis: true },
+                  { key: 'rms', label: 'RMs', width: '14%', align: 'center' },
+                  { key: 'prazo', label: 'Prazo', width: '19%', align: 'center' },
+                  { key: 'limite', label: 'Separar até', width: '19%', align: 'center' }
+                ]}
+                linhas={diff.demandasNovas.map(d => ({
+                  ref: `${ORIGEM_LABEL[d.origem] || d.origem}${d.referencia ? ` — ${d.referencia}` : ''}`,
+                  rms: d.qtd,
+                  prazo: formatarBr(d.prazo),
+                  limite: formatarBr(limiteDeSeparacao(d.prazo, d.diasExpedicao))
+                }))}
+              />
+            </div>
+          )}
+
+          {(diff.bloqueiosNovos.length > 0 || diff.bloqueiosRemovidos.length > 0) && (
+            <div style={{ breakInside: 'avoid', marginBottom: 16 }}>
+              <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 5 }}>Mudanças nos dias de separação</p>
+              <div className="h-px bg-slate-300" style={{ marginBottom: 8 }} />
+              {diff.bloqueiosNovos.map(b => (
+                <p key={`n${b.data}`} className="text-[10px] text-slate-700" style={{ lineHeight: '15px' }}>
+                  <strong>{formatarBr(b.data)}</strong> passou a não ter separação — {b.motivo}
+                </p>
+              ))}
+              {diff.bloqueiosRemovidos.map(b => (
+                <p key={`r${b.data}`} className="text-[10px] text-slate-700" style={{ lineHeight: '15px' }}>
+                  <strong>{formatarBr(b.data)}</strong> voltou a ter separação (antes: {b.motivo})
+                </p>
+              ))}
+            </div>
+          )}
+
+          {[
+            { titulo: 'RMs incluídas nesta versão', itens: diff.entraram, dia: a => a.dia },
+            { titulo: 'RMs retiradas da programação', itens: diff.sairam, dia: a => a.dia }
+          ].map(bloco => bloco.itens.length > 0 && (
+            <div key={bloco.titulo} style={{ marginBottom: 16 }}>
+              <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 5 }}>{bloco.titulo} — {bloco.itens.length} RM(s)</p>
+              <div className="h-px bg-slate-300" style={{ marginBottom: 8 }} />
+              {agruparParaAnexo(bloco.itens).map((g, i) => (
+                <div key={i} style={{ marginBottom: 9, breakInside: 'avoid' }}>
+                  <p className="text-[10px] font-bold text-slate-800">
+                    {g.cam} — {g.rms.length} RM(s) · <span className="font-normal text-slate-500">{g.justificativa}</span>
+                  </p>
+                  <p className="text-[9px] text-slate-500" style={{ lineHeight: '13px', marginTop: 1, wordBreak: 'break-word' }}>
+                    {g.rms.join(', ')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {diff.remanejadas.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 5 }}>RMs que mudaram de dia — {diff.remanejadas.length} RM(s)</p>
+              <div className="h-px bg-slate-300" style={{ marginBottom: 8 }} />
+              {Object.entries(
+                diff.remanejadas.reduce((acc, a) => {
+                  const chave = `${a.diaAnterior}→${a.dia}`;
+                  (acc[chave] = acc[chave] || []).push(a.rm);
+                  return acc;
+                }, {})
+              ).map(([chave, rms]) => {
+                const [de, para] = chave.split('→');
+                return (
+                  <div key={chave} style={{ marginBottom: 9, breakInside: 'avoid' }}>
+                    <p className="text-[10px] font-bold text-slate-800">
+                      De {formatarBr(de)} para {formatarBr(para)} — {rms.length} RM(s)
+                    </p>
+                    <p className="text-[9px] text-slate-500" style={{ lineHeight: '13px', marginTop: 1, wordBreak: 'break-word' }}>{rms.join(', ')}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {diff.totalMudancas === 0 && (
+            <p className="text-[10px] text-slate-600">Nenhuma RM mudou de dia, entrou ou saiu em relação à versão anterior.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 });

@@ -5,6 +5,7 @@ import CapacidadePanel from './CapacidadePanel';
 import DemandasPanel from './DemandasPanel';
 import GradeSemanal from './GradeSemanal';
 import DocumentoCard from './DocumentoCard';
+import VersoesPanel from './VersoesPanel';
 import { rotuloSemana, somaDias, segundaDaSemana, formatarBr } from '../../utils/programacao/semana';
 
 const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
@@ -63,16 +64,27 @@ const ProgramacaoTab = (p) => (
 
     {p.resultado && <GradeSemanal resultado={p.resultado} />}
 
-    <DocumentoCard
-      resultado={p.resultado}
-      semanaRef={p.semanaRef}
-      demandas={p.demandas}
-      bloqueios={p.bloqueios}
-      programador={p.programador}
-      setProgramador={p.setProgramador}
-      encarregado={p.encarregado}
-      setEncarregado={p.setEncarregado}
-    />
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <VersoesPanel
+        versoes={p.versoes}
+        ultimaVersao={p.ultimaVersao}
+        diffPendente={p.diffPendente}
+        publicar={p.publicar}
+        removerUltimaVersao={p.removerUltimaVersao}
+        programador={p.programador}
+        resultado={p.resultado}
+      />
+      <DocumentoCard
+        versoes={p.versoes}
+        ultimaVersao={p.ultimaVersao}
+        diffPendente={p.diffPendente}
+        semanaRef={p.semanaRef}
+        programador={p.programador}
+        setProgramador={p.setProgramador}
+        encarregado={p.encarregado}
+        setEncarregado={p.setEncarregado}
+      />
+    </div>
 
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <DemandasPanel demandas={p.demandas} adicionarDemanda={p.adicionarDemanda} removerDemanda={p.removerDemanda} />
