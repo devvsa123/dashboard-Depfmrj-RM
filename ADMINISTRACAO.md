@@ -100,7 +100,9 @@ update auth.users set email_confirmed_at = now() where email = 'o-email@exemplo.
 O plano gratuito pausa o projeto depois de cerca de uma semana sem
 nenhum acesso. O sintoma é a aba Programação parar de carregar. Entre no
 painel do Supabase e clique em **Restore project** — leva alguns minutos.
-Para evitar, mantenha o acesso semanal ou assine o plano pago.
+
+Existe uma verificação automática para isso não acontecer (seção 7). Se
+o projeto hibernou mesmo assim, veja ali o que checar.
 
 ### O dashboard não atualiza os dados do WMS
 
@@ -152,3 +154,60 @@ esquerdo.
 
 O site republica sozinho a cada envio para o branch `main` do GitHub.
 Não há passo manual de publicação.
+
+---
+
+## 7. A verificação diária que impede a hibernação
+
+O projeto gratuito do Supabase hiberna depois de cerca de uma semana sem
+nenhum acesso ao banco. Como o uso aqui é semanal — e em recesso passa de
+uma semana —, sem isso o sistema estaria fora do ar justamente numa
+segunda de manhã, com a programação para fazer.
+
+Uma rotina no GitHub lê uma linha do banco todo dia às 08:00 (horário de
+Brasília) e isso basta: o que o Supabase mede é acesso, não volume.
+
+**Onde fica:** `.github/workflows/manter-banco-acordado.yml`, no
+repositório. Para ver se está rodando: aba **Actions** do repositório no
+GitHub → **Manter o banco acordado**. Cada execução aparece com visto
+verde ou X vermelho.
+
+**Para testar na hora:** entre nessa tela e clique em **Run workflow**.
+
+### Os dois segredos
+
+A rotina precisa de dois segredos cadastrados no repositório. Sem eles,
+ela falha todo dia com a mensagem dizendo exatamente isso.
+
+GitHub → repositório → **Settings** → **Secrets and variables** →
+**Actions** → **New repository secret**:
+
+| Nome | Valor |
+|---|---|
+| `SUPABASE_URL` | `https://nrsjnsuicztneimlauwa.supabase.co` |
+| `SUPABASE_ANON_KEY` | A chave anon public do projeto |
+
+### Se a rotina falhar
+
+A mensagem do erro já diz o que fazer. Resumindo:
+
+| Mensagem | Causa |
+|---|---|
+| Faltam os segredos | Os dois segredos acima não foram cadastrados |
+| Não foi possível falar com o Supabase | O projeto já hibernou — restaure no painel |
+| O banco recusou a chave | `SUPABASE_ANON_KEY` errada, ou o schema não foi rodado |
+| A tabela saude não existe | Rode de novo o `supabase/schema.sql` |
+
+### A armadilha dos 60 dias
+
+**O GitHub desliga sozinho rotinas agendadas quando o repositório fica 60
+dias sem nenhuma atividade.** Como esta rotina existe justamente para
+funcionar sem ninguém olhar, esse é o jeito mais provável de ela parar em
+silêncio.
+
+Qualquer envio de código zera essa contagem, então em período de mudanças
+o problema não aparece. O risco é no sistema estável e parado.
+
+Se o sistema ficar bastante tempo sem alterações, vale abrir a aba
+**Actions** de vez em quando: quando o GitHub desliga o agendamento, ele
+mostra um aviso ali com um botão para religar.

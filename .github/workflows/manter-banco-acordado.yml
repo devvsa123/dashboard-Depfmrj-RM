@@ -1,0 +1,67 @@
+# O projeto gratuito do Supabase hiberna depois de cerca de uma semana sem
+# nenhum acesso ao banco. O uso aqui é semanal — e em recesso ou férias
+# passa de uma semana —, então sem isto o sistema estaria fora do ar
+# justamente numa segunda de manhã, com a programação para fazer.
+#
+# Uma leitura por dia na tabela `saude` basta: o que o Supabase mede é
+# acesso ao banco, não volume.
+name: Manter o banco acordado
+
+on:
+  schedule:
+    # 11:00 UTC = 08:00 em Brasília. O GitHub pode atrasar execuções
+    # agendadas em horário de pico; para este uso, atraso não importa.
+    - cron: '0 11 * * *'
+  # Permite rodar na mão pelo botão "Run workflow", para testar.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Tocar no banco
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ler a tabela de sinal de vida
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -u
+          if [ -z "${URL:-}" ] || [ -z "${KEY:-}" ]; then
+            echo "::error::Faltam os segredos do repositório. Vá em Settings → Secrets and variables → Actions e cadastre SUPABASE_URL e SUPABASE_ANON_KEY."
+            exit 1
+          fi
+
+          # O -w já imprime 000 quando o curl não conecta; o "|| true" só
+          # impede que o erro do curl derrube o passo antes da mensagem.
+          : > resposta.txt
+          codigo=$(curl -sS --max-time 60 -o resposta.txt -w '%{http_code}' \
+            -H "apikey: ${KEY}" \
+            -H "Authorization: Bearer ${KEY}" \
+            "${URL}/rest/v1/saude?select=verificado_em&limit=1") || true
+          codigo=${codigo:-000}
+
+          echo "HTTP ${codigo}"
+          echo "Resposta: $(cat resposta.txt)"
+
+          case "${codigo}" in
+            200)
+              echo "Banco respondeu. Hibernação adiada por mais um dia."
+              ;;
+            000)
+              echo "::error::Não foi possível falar com o Supabase. O projeto pode já estar hibernado — entre no painel e clique em Restore project."
+              exit 1
+              ;;
+            401|403)
+              echo "::error::O banco recusou a chave. Confira o segredo SUPABASE_ANON_KEY (tem que ser a anon public) e se o schema.sql foi rodado — é ele que cria a tabela saude."
+              exit 1
+              ;;
+            404)
+              echo "::error::A tabela saude não existe. Rode de novo o supabase/schema.sql no SQL Editor."
+              exit 1
+              ;;
+            *)
+              echo "::error::Resposta inesperada do Supabase (HTTP ${codigo})."
+              exit 1
+              ;;
+          esac

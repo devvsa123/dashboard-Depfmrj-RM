@@ -69,6 +69,28 @@ create table if not exists public.config (
   valor  jsonb not null
 );
 
+-- ---------------------------------------------------------------------
+-- Tabela de sinal de vida. Existe só para a verificação diária poder
+-- tocar no banco sem precisar de senha: o projeto gratuito do Supabase
+-- hiberna depois de cerca de uma semana sem nenhum acesso, e acordar
+-- manualmente numa segunda de manhã, com a programação para fazer, é o
+-- pior momento possível.
+--
+-- É a única tabela de leitura pública do sistema, e de propósito: ela
+-- guarda uma data e nada mais. Nenhum dado de programação passa por aqui.
+-- ---------------------------------------------------------------------
+create table if not exists public.saude (
+  id             integer primary key default 1,
+  verificado_em  timestamptz not null default now(),
+  constraint saude_linha_unica check (id = 1)
+);
+insert into public.saude (id) values (1) on conflict (id) do nothing;
+
+alter table public.saude enable row level security;
+drop policy if exists "leitura_publica_saude" on public.saude;
+create policy "leitura_publica_saude" on public.saude for select to anon, authenticated using (true);
+grant select on public.saude to anon, authenticated;
+
 -- =====================================================================
 -- Controle de acesso
 -- =====================================================================
@@ -93,10 +115,10 @@ end $$;
 grant usage on schema public to authenticated;
 
 -- =====================================================================
--- Conferência: deve listar as 5 tabelas, todas com RLS ligada.
+-- Conferência: deve listar as 6 tabelas, todas com RLS ligada.
 -- =====================================================================
 select tablename, rowsecurity as rls_ligada
 from pg_tables
 where schemaname = 'public'
-  and tablename in ('programacoes','demandas','bloqueios','capacidade_overrides','config')
+  and tablename in ('programacoes','demandas','bloqueios','capacidade_overrides','config','saude')
 order by tablename;
