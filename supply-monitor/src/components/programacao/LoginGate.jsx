@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Lock, LogIn, Loader2, AlertCircle, ShieldAlert } from 'lucide-react';
-import { supabaseConfigurado, AVISO_SEM_CONFIG } from '../../lib/supabase';
+import { Lock, LogIn, Loader2, AlertCircle, ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
+import { supabaseConfigurado, AVISO_SEM_CONFIG, diagnosticoConfig } from '../../lib/supabase';
 
 // Porta de entrada do módulo. A programação é trabalho interno dos
 // programadores do DepFMRJ, então nada dela aparece para quem não entrou.
@@ -11,10 +11,32 @@ const LoginGate = ({ auth, children }) => {
 
   if (!supabaseConfigurado) {
     return (
-      <div className="max-w-xl mx-auto mt-16 bg-white rounded-3xl border border-amber-200 p-8 text-center">
-        <ShieldAlert className="text-amber-500 mx-auto mb-4" size={40} />
-        <h2 className="text-lg font-black text-slate-800">Banco não configurado</h2>
-        <p className="text-sm text-slate-500 font-medium mt-2 leading-relaxed">{AVISO_SEM_CONFIG}</p>
+      <div className="max-w-xl mx-auto mt-16 bg-white rounded-3xl border border-amber-200 p-8">
+        <div className="text-center">
+          <ShieldAlert className="text-amber-500 mx-auto mb-4" size={40} />
+          <h2 className="text-lg font-black text-slate-800">Banco não configurado</h2>
+          <p className="text-sm text-slate-500 font-medium mt-2 leading-relaxed">{AVISO_SEM_CONFIG}</p>
+        </div>
+        <div className="mt-6 space-y-2">
+          {diagnosticoConfig().map(v => (
+            <div key={v.nome} className={`flex items-start gap-2.5 p-3 rounded-xl border text-left ${v.presente ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+              {v.presente
+                ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                : <XCircle size={16} className="text-red-500 shrink-0 mt-0.5" />}
+              <div className="min-w-0">
+                <p className={`text-xs font-black ${v.presente ? 'text-emerald-800' : 'text-red-700'}`}>{v.nome}</p>
+                <p className="text-[11px] font-medium text-slate-500 break-all">
+                  {v.presente ? v.valor : 'não chegou ao site nesta publicação'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-400 font-medium mt-4 leading-relaxed">
+          Se as duas aparecem em verde aqui mas o erro continua, o problema é outro — me avise.
+          Se aparecem em vermelho depois de cadastradas, falta republicar o site, ou elas foram
+          cadastradas em outro ambiente (Production, Preview e Development são separados na Vercel).
+        </p>
       </div>
     );
   }
