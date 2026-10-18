@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Loader2, Activity, Clock, LayoutDashboard, Hourglass,
-  Network, Database, Search, AlertCircle, Package
+  Network, Database, Search, AlertCircle, Package, CalendarRange
 } from 'lucide-react';
 import { downloadExcel } from './utils/spreadsheet';
 import { useSpreadsheetSync } from './hooks/useSpreadsheetSync';
@@ -17,12 +17,14 @@ import { useStcGtcAnalysis } from './hooks/useStcGtcAnalysis';
 import { useRmTypeComparison } from './hooks/useRmTypeComparison';
 import { useCamAnalysis } from './hooks/useCamAnalysis';
 import { useItemAnalysis, NIVEIS } from './hooks/useItemAnalysis';
+import { useProgramacao } from './hooks/useProgramacao';
 import { useTrendForecast } from './hooks/useTrendForecast';
 import DashboardTab from './components/DashboardTab';
 import BacklogTab from './components/BacklogTab';
 import InterfaceTab from './components/InterfaceTab';
 import EmailSearchTab from './components/EmailSearchTab';
 import ItemAnalysisTab from './components/ItemAnalysisTab';
+import ProgramacaoTab from './components/programacao/ProgramacaoTab';
 import HealthBadge from './components/HealthBadge';
 
 const NIVEL_FILHO_LABEL = { familia: 'Linha / Conjunto', linha: 'Grade', grade: 'Tamanho' };
@@ -52,6 +54,7 @@ const App = () => {
   const rmTypeComparison = useRmTypeComparison(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const camAnalysis = useCamAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const itemAnalysis = useItemAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
+  const programacao = useProgramacao(data);
   const trendForecast = useTrendForecast(dashboardAnalytics.chartData);
   const riskAlerts = useRiskAlerts({
     backlogAnalysis: backlogAnalysis.backlogAnalysis,
@@ -97,6 +100,7 @@ const App = () => {
               <button onClick={() => setActiveTab('backlog')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'backlog' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Hourglass size={16} /> RM em processamento</button>
               <button onClick={() => setActiveTab('interface')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'interface' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Network size={16} /> Interface SINGRA x WMS</button>
               <button onClick={() => setActiveTab('item')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'item' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Package size={16} /> Por Item</button>
+              <button onClick={() => setActiveTab('programacao')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'programacao' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><CalendarRange size={16} /> Programação</button>
               <button onClick={() => setActiveTab('email')} className={`px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-all ${activeTab === 'email' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Search size={16} /> Busca por E-mail</button>
             </div>
           )}
@@ -187,6 +191,8 @@ const App = () => {
               nivelFilhoLabel={NIVEL_FILHO_LABEL[itemAnalysis.nivel]}
               handleDownloadExcel={downloadExcel}
             />
+          ) : activeTab === 'programacao' ? (
+            <ProgramacaoTab {...programacao} />
           ) : activeTab === 'email' ? (
             <EmailSearchTab
               emailText={emailExtractor.emailText}
