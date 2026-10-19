@@ -18,6 +18,7 @@ import { Secao, Titulo, Tabela, Assinaturas } from './pecasDoDocumento';
 
 const ORIGEM_LABEL = Object.fromEntries(ORIGENS.map(o => [o.key, o.label]));
 ORIGEM_LABEL.ANTIGUIDADE = 'Fila por antiguidade';
+ORIGEM_LABEL.ROTA = 'Rota do CAM';
 
 const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador, encarregado, versao, emitidoEm }, ref) => {
   if (!snapshot) return <div ref={ref} />;
@@ -89,9 +90,10 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
           ))}
         </div>
         <p className="text-[10px] text-slate-600" style={{ marginTop: 10, lineHeight: '15px' }}>
-          Das {resumo.totalProgramado} RMs programadas, {resumo.comPrazo} atendem demanda com prazo definido e {resumo.porAntiguidade} saem
-          da fila por antiguidade. A fila de separação soma {resumo.filaTotal} RMs — pedidos que ainda dependem de trabalho do depósito,
-          sem contar os já conferidos e entregues à Expedição.
+          Das {resumo.totalProgramado} RMs programadas, {resumo.comPrazo} atendem demanda com prazo definido
+          {resumo.porRota ? `, ${resumo.porRota} foram alocadas para pegar a rota do próprio CAM dentro da semana` : ''} e
+          {' '}{resumo.porAntiguidade} saem da fila por antiguidade. A fila de separação soma {resumo.filaTotal} RMs — pedidos
+          que ainda dependem de trabalho do depósito, sem contar os já conferidos e entregues à Expedição.
         </p>
     </Secao>);
 

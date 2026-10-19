@@ -10,7 +10,7 @@ import * as armazem from '../utils/programacao/armazenamento';
 // banco. A gravação é otimista: a tela muda na hora e a escrita segue em
 // paralelo; se falhar, o erro aparece — nunca fica a impressão de ter
 // salvo o que não salvou.
-export const useProgramacao = (data, auth) => {
+export const useProgramacao = (data, auth, rotasPorCam = null) => {
   const autenticado = Boolean(auth?.autenticado);
 
   const [semanaRef, setSemanaRef] = useState(() => segundaDaSemana(somaDias(hojeIso(), 7)));
@@ -105,9 +105,12 @@ export const useProgramacao = (data, auth) => {
       fila,
       capacidade: { porDiaSemana: capacidadeMedida.porDiaSemana, overrides },
       bloqueios,
+      // O cadastro de rotas entra aqui: sem ele o motor volta a programar
+      // só por antiguidade, que é o comportamento de antes.
+      rotas: rotasPorCam,
       hoje: hojeIso()
     });
-  }, [semanaRef, demandasConferidas, fila, capacidadeMedida, overrides, bloqueios]);
+  }, [semanaRef, demandasConferidas, fila, capacidadeMedida, overrides, bloqueios, rotasPorCam]);
 
   // ── Mutações ──────────────────────────────────────────────────────
   const adicionarDemanda = useCallback(({ texto, origem, referencia, prazo, diasExpedicao }) => {

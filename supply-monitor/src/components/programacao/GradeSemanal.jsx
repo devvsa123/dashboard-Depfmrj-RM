@@ -7,7 +7,8 @@ const TOM_ORIGEM = {
   MENSAGEM: 'bg-indigo-100 text-indigo-700',
   GERENCIA: 'bg-violet-100 text-violet-700',
   OUTRO: 'bg-slate-100 text-slate-600',
-  ANTIGUIDADE: 'bg-slate-50 text-slate-500'
+  ANTIGUIDADE: 'bg-slate-50 text-slate-500',
+  ROTA: 'bg-emerald-100 text-emerald-700'
 };
 
 const DetalheDia = ({ slot, onClose }) => {

@@ -58,8 +58,8 @@ const App = () => {
   const camAnalysis = useCamAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const itemAnalysis = useItemAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const auth = useAuth();
-  const programacao = useProgramacao(data, auth);
   const camConfig = useCamConfig(data, auth);
+  const programacao = useProgramacao(data, auth, camConfig.porCam);
   const trendForecast = useTrendForecast(dashboardAnalytics.chartData);
   const riskAlerts = useRiskAlerts({
     backlogAnalysis: backlogAnalysis.backlogAnalysis,

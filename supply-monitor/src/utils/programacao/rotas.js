@@ -1,4 +1,4 @@
-import { somaDias, diaDaSemana, DIAS_CURTOS, isoParaPartes, hojeIso } from './semana';
+import { somaDias, somaDiasUteis, diaDaSemana, DIAS_CURTOS, isoParaPartes, hojeIso } from './semana';
 
 // Cadastro de CAM e rotas: quem entrega cada cliente e quando.
 //
@@ -110,17 +110,42 @@ export const proximaJanela = (config, aPartirDe = hojeIso()) => {
   return mes === 12 ? monta(ano + 1, 1) : monta(ano, mes + 1);
 };
 
-// O prazo que a rota impõe: até quando a RM precisa estar CONFERIDA
-// para pegar a próxima saída. Um dia antes da rota, porque a Expedição
-// precisa montar o mapa e prontificar.
+// O prazo que a rota impõe: até quando a RM precisa estar CONFERIDA para
+// pegar a próxima saída. A folga é contada em DIAS ÚTEIS, e não em dias
+// corridos, por um motivo prático: numa rota de segunda, a véspera é o
+// domingo. Contando em dia corrido o prazo cairia fora de qualquer semana
+// programada e o CAM nunca seria priorizado — o depósito separaria para
+// ele sempre depois do caminhão passar. Em dia útil a véspera é a sexta
+// anterior, que é quando o trabalho de fato precisa estar pronto.
+//
+// E a saída procurada é a próxima ALCANÇÁVEL: se a conferência já não dá
+// mais tempo para a rota desta semana, o prazo é o da seguinte. Prometer
+// um caminhão que já passou não ajuda ninguém.
 export const prazoDaRota = (config, aPartirDe = hojeIso(), folgaDias = 1) => {
   if (config?.tratamento === TRATAMENTOS.GTC) {
-    const rota = proximaRota(config, aPartirDe);
-    return rota ? { tipo: 'GTC', saida: rota, conferirAte: somaDias(rota, -folgaDias) } : null;
+    let cursor = aPartirDe;
+    for (let i = 0; i < 4; i++) {
+      const rota = proximaRota(config, cursor);
+      if (!rota) return null;
+      const conferirAte = somaDiasUteis(rota, -folgaDias);
+      if (conferirAte >= aPartirDe) return { tipo: 'GTC', saida: rota, conferirAte };
+      cursor = somaDias(rota, 1);
+    }
+    return null;
   }
   if (config?.tratamento === TRATAMENTOS.STC) {
-    const janela = proximaJanela(config, aPartirDe);
-    return janela ? { tipo: 'STC', saida: janela.fim, conferirAte: somaDias(janela.inicio, -folgaDias), janela } : null;
+    let cursor = aPartirDe;
+    for (let i = 0; i < 3; i++) {
+      const janela = proximaJanela(config, cursor);
+      if (!janela) return null;
+      // Mira o começo da janela, para a STC poder ser lançada no primeiro
+      // dia. Se a janela já começou, o que resta é o último dia dela.
+      const alvo = janela.inicio > aPartirDe ? janela.inicio : janela.fim;
+      const conferirAte = somaDiasUteis(alvo, -folgaDias);
+      if (conferirAte >= aPartirDe) return { tipo: 'STC', saida: janela.fim, conferirAte, janela };
+      cursor = somaDias(janela.fim, 1);
+    }
+    return null;
   }
   return null;
 };

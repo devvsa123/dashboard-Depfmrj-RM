@@ -11,6 +11,7 @@ import { ORIGENS } from './motor';
 
 const ORIGEM_LABEL = Object.fromEntries(ORIGENS.map(o => [o.key, o.label]));
 ORIGEM_LABEL.ANTIGUIDADE = 'Fila por antiguidade';
+ORIGEM_LABEL.ROTA = 'Rota do CAM';
 
 export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
   grade: resultado.grade.map(s => ({
