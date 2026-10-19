@@ -131,7 +131,7 @@ se for parar no site, qualquer um lê e apaga o banco inteiro.
 A estrutura está em `supabase/schema.sql`, no repositório. O arquivo é
 seguro para rodar de novo: não apaga nada existente.
 
-Cinco tabelas:
+Sete tabelas:
 
 | Tabela | Guarda |
 |---|---|
@@ -139,10 +139,19 @@ Cinco tabelas:
 | `demandas` | Mensagens e pedidos registrados, com as RMs coladas |
 | `bloqueios` | Dias sem separação, com o motivo |
 | `capacidade_overrides` | Capacidade ajustada na mão para um dia |
+| `cam_config` | Quem entrega cada CAM e quando — rotas da GTC e janelas da STC |
 | `config` | Preferências compartilhadas |
+| `saude` | Uma linha só, lida pela verificação diária que impede a hibernação |
 
 Todas com controle de acesso ligado: quem não está autenticado não lê
-nada. Os três programadores têm o mesmo poder — não há papel de chefe no
+nada — menos a `saude`, que é de leitura pública de propósito, porque a
+verificação diária a consulta sem estar logada.
+
+O `cam_config` tem uma carga inicial em `supabase/rotas_iniciais.sql`,
+com os CAM já classificados a partir da planilha de CAM e do quadro da
+Seção de Estocagem. É seguro rodar de novo: nunca sobrescreve um CAM que
+já foi ajustado na tela. Para refazer um CAM específico, apague a linha
+dele antes. Os três programadores têm o mesmo poder — não há papel de chefe no
 banco, porque eles se revezam no mesmo trabalho.
 
 Para olhar os dados sem risco de estragar: **Table Editor**, no menu
