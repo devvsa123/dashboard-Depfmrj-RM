@@ -7,6 +7,7 @@ import GradeSemanal from './GradeSemanal';
 import DocumentoCard from './DocumentoCard';
 import AcompanhamentoPanel from './AcompanhamentoPanel';
 import ConfigCamPanel from './ConfigCamPanel';
+import ExpedicaoPanel from './ExpedicaoPanel';
 import VersoesPanel from './VersoesPanel';
 import { rotuloSemana, somaDias, segundaDaSemana, formatarBr } from '../../utils/programacao/semana';
 
@@ -49,15 +50,19 @@ const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
 const SUBABAS = [
   { key: 'montagem', label: 'Montar a semana' },
   { key: 'andamento', label: 'Andamento' },
+  { key: 'expedicao', label: 'Expedição' },
   { key: 'config', label: 'CAM e Rotas' }
 ];
+
+// Abas que não falam de uma semana específica: olham o estado de agora.
+const SEM_SEMANA = new Set(['config', 'expedicao']);
 
 const ProgramacaoTab = (p) => {
   const [subaba, setSubaba] = useState('montagem');
   return (
   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
     <div className="flex items-center justify-between gap-3 flex-wrap">
-      {subaba === 'config'
+      {SEM_SEMANA.has(subaba)
         ? <span />
         : <SectionLabel title="Programação Semanal" description="Proposta de grade de atendimento — o programador valida, ajusta e publica" />}
       {p.auth?.autenticado && (
@@ -96,7 +101,7 @@ const ProgramacaoTab = (p) => {
       ))}
     </div>
 
-    {subaba !== 'config' && (
+    {!SEM_SEMANA.has(subaba) && (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <CalendarRange className="text-indigo-500" size={20} />
@@ -115,7 +120,9 @@ const ProgramacaoTab = (p) => {
     </div>
     )}
 
-    {subaba === 'config' ? (
+    {subaba === 'expedicao' ? (
+      <ExpedicaoPanel indiceWms={p.indiceWms} porCam={p.camConfig.porCam} />
+    ) : subaba === 'config' ? (
       <ConfigCamPanel
         linhas={p.camConfig.linhas}
         resumo={p.camConfig.resumo}
