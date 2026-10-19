@@ -125,3 +125,39 @@ export const apagarVersao = async (semana, numero) => {
   const { error } = await supabase.from('programacoes').delete().eq('semana', semana).eq('versao', numero);
   if (error) throw error;
 };
+
+// ── Cadastro de CAM e rotas ──────────────────────────────────────────
+export const carregarCamConfig = async () => {
+  if (semBanco()) return [];
+  const { data, error } = await supabase.from('cam_config').select('*').order('cam');
+  if (error) throw error;
+  return (data || []).map(l => ({
+    cam: l.cam,
+    sigla: l.sigla || '',
+    tratamento: l.tratamento,
+    documentoEsperado: l.documento_esperado || null,
+    diasRota: l.dias_rota || [],
+    janelaInicio: l.janela_inicio ?? null,
+    janelaFim: l.janela_fim ?? null,
+    observacao: l.observacao || '',
+    atualizadoEm: l.atualizado_em,
+    atualizadoPor: l.atualizado_por || ''
+  }));
+};
+
+export const salvarCamConfig = async (c, porNome) => {
+  if (semBanco()) return;
+  const { error } = await supabase.from('cam_config').upsert({
+    cam: c.cam,
+    sigla: c.sigla || '',
+    tratamento: c.tratamento,
+    documento_esperado: c.documentoEsperado,
+    dias_rota: c.diasRota || [],
+    janela_inicio: c.janelaInicio,
+    janela_fim: c.janelaFim,
+    observacao: c.observacao || '',
+    atualizado_em: new Date().toISOString(),
+    atualizado_por: porNome || ''
+  }, { onConflict: 'cam' });
+  if (error) throw error;
+};

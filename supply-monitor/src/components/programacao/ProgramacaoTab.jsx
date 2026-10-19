@@ -6,6 +6,7 @@ import DemandasPanel from './DemandasPanel';
 import GradeSemanal from './GradeSemanal';
 import DocumentoCard from './DocumentoCard';
 import AcompanhamentoPanel from './AcompanhamentoPanel';
+import ConfigCamPanel from './ConfigCamPanel';
 import VersoesPanel from './VersoesPanel';
 import { rotuloSemana, somaDias, segundaDaSemana, formatarBr } from '../../utils/programacao/semana';
 
@@ -47,7 +48,8 @@ const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
 // continua sendo dele.
 const SUBABAS = [
   { key: 'montagem', label: 'Montar a semana' },
-  { key: 'andamento', label: 'Andamento' }
+  { key: 'andamento', label: 'Andamento' },
+  { key: 'config', label: 'CAM e Rotas' }
 ];
 
 const ProgramacaoTab = (p) => {
@@ -55,7 +57,9 @@ const ProgramacaoTab = (p) => {
   return (
   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
     <div className="flex items-center justify-between gap-3 flex-wrap">
-      <SectionLabel title="Programação Semanal" description="Proposta de grade de atendimento — o programador valida, ajusta e publica" />
+      {subaba === 'config'
+        ? <span />
+        : <SectionLabel title="Programação Semanal" description="Proposta de grade de atendimento — o programador valida, ajusta e publica" />}
       {p.auth?.autenticado && (
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
@@ -92,6 +96,7 @@ const ProgramacaoTab = (p) => {
       ))}
     </div>
 
+    {subaba !== 'config' && (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <CalendarRange className="text-indigo-500" size={20} />
@@ -108,8 +113,18 @@ const ProgramacaoTab = (p) => {
         <button onClick={() => p.setSemanaRef(segundaDaSemana(somaDias(p.semanaRef, 7)))} className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100"><ChevronRight size={18} /></button>
       </div>
     </div>
+    )}
 
-    {subaba === 'andamento' ? (
+    {subaba === 'config' ? (
+      <ConfigCamPanel
+        linhas={p.camConfig.linhas}
+        resumo={p.camConfig.resumo}
+        salvar={p.camConfig.salvar}
+        carregando={p.camConfig.carregando}
+        salvando={p.camConfig.salvando}
+        erro={p.camConfig.erro}
+      />
+    ) : subaba === 'andamento' ? (
       <AcompanhamentoPanel
         versoes={p.versoes}
         semanaRef={p.semanaRef}

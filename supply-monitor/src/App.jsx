@@ -19,6 +19,7 @@ import { useCamAnalysis } from './hooks/useCamAnalysis';
 import { useItemAnalysis, NIVEIS } from './hooks/useItemAnalysis';
 import { useProgramacao } from './hooks/useProgramacao';
 import { useAuth } from './hooks/useAuth';
+import { useCamConfig } from './hooks/useCamConfig';
 import LoginGate from './components/programacao/LoginGate';
 import { useTrendForecast } from './hooks/useTrendForecast';
 import DashboardTab from './components/DashboardTab';
@@ -58,6 +59,7 @@ const App = () => {
   const itemAnalysis = useItemAnalysis(data, dashboardAnalytics.chartData, dashboardAnalytics.visibleRange);
   const auth = useAuth();
   const programacao = useProgramacao(data, auth);
+  const camConfig = useCamConfig(data, auth);
   const trendForecast = useTrendForecast(dashboardAnalytics.chartData);
   const riskAlerts = useRiskAlerts({
     backlogAnalysis: backlogAnalysis.backlogAnalysis,
@@ -196,7 +198,7 @@ const App = () => {
             />
           ) : activeTab === 'programacao' ? (
             <LoginGate auth={auth}>
-              <ProgramacaoTab {...programacao} auth={auth} handleDownloadExcel={downloadExcel} />
+              <ProgramacaoTab {...programacao} auth={auth} camConfig={camConfig} handleDownloadExcel={downloadExcel} />
             </LoginGate>
           ) : activeTab === 'email' ? (
             <EmailSearchTab

@@ -70,6 +70,35 @@ create table if not exists public.config (
 );
 
 -- ---------------------------------------------------------------------
+-- Cadastro de CAM e rotas. Define, para cada cliente, quem entrega e
+-- quando — o que transforma o quadro da parede em dado.
+--
+-- tratamento  GTC   = nós entregamos, em dia fixo da semana
+--             STC   = terceiro retira (CDAM ou transportadora), em janela
+--                     do mês combinada
+--             OCULTO = CAM que existe na base mas não é mais usado
+--
+-- documento_esperado existe separado do tratamento porque os dois nem
+-- sempre andam juntos: o NÚCLEO DE IMPLANTAÇÃO é entrega a empresa (quem
+-- retira é terceiro, logo tratamento STC), mas o documento lançado no
+-- sistema é GTC. Quem manda na fila é o tratamento; o documento esperado
+-- serve para conferir o que aparece no WMS.
+-- ---------------------------------------------------------------------
+create table if not exists public.cam_config (
+  cam                 text primary key,
+  sigla               text not null default '',
+  tratamento          text not null default 'PENDENTE'
+                      check (tratamento in ('GTC','STC','OCULTO','PENDENTE')),
+  documento_esperado  text check (documento_esperado in ('GTC','STC')),
+  dias_rota           integer[] not null default '{}',
+  janela_inicio       integer check (janela_inicio between 1 and 31),
+  janela_fim          integer check (janela_fim between 1 and 31),
+  observacao          text not null default '',
+  atualizado_em       timestamptz not null default now(),
+  atualizado_por      text not null default ''
+);
+
+-- ---------------------------------------------------------------------
 -- Tabela de sinal de vida. Existe só para a verificação diária poder
 -- tocar no banco sem precisar de senha: o projeto gratuito do Supabase
 -- hiberna depois de cerca de uma semana sem nenhum acesso, e acordar
@@ -99,11 +128,12 @@ alter table public.demandas              enable row level security;
 alter table public.bloqueios             enable row level security;
 alter table public.capacidade_overrides  enable row level security;
 alter table public.config                enable row level security;
+alter table public.cam_config            enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['programacoes','demandas','bloqueios','capacidade_overrides','config'] loop
+  foreach t in array array['programacoes','demandas','bloqueios','capacidade_overrides','config','cam_config'] loop
     execute format('drop policy if exists "programadores_autenticados" on public.%I', t);
     execute format(
       'create policy "programadores_autenticados" on public.%I
@@ -115,10 +145,10 @@ end $$;
 grant usage on schema public to authenticated;
 
 -- =====================================================================
--- Conferência: deve listar as 6 tabelas, todas com RLS ligada.
+-- Conferência: deve listar as 7 tabelas, todas com RLS ligada.
 -- =====================================================================
 select tablename, rowsecurity as rls_ligada
 from pg_tables
 where schemaname = 'public'
-  and tablename in ('programacoes','demandas','bloqueios','capacidade_overrides','config','saude')
+  and tablename in ('programacoes','demandas','bloqueios','capacidade_overrides','config','saude','cam_config')
 order by tablename;
