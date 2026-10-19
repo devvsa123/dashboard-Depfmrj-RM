@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Truck, PackageCheck, Clock, AlertTriangle, ChevronDown, ChevronRight, FileWarning, Settings2 } from 'lucide-react';
 import SectionLabel from '../SectionLabel';
+import DocumentoExpedicaoCard from './DocumentoExpedicaoCard';
 import { montarFilasExpedicao } from '../../utils/programacao/expedicao';
 import { NIVEIS_COBRANCA, rotaDescrita } from '../../utils/programacao/rotas';
 import { formatarBr, hojeIso } from '../../utils/programacao/semana';
@@ -123,7 +124,7 @@ const GrupoCam = ({ g, modo }) => {
 // Fila da Expedição: o que acontece depois do CONFERIDO. Três filas com
 // fins diferentes — prontificar, entregar e cobrar — porque só as duas
 // primeiras dependem de nós.
-const ExpedicaoPanel = ({ indiceWms, porCam }) => {
+const ExpedicaoPanel = ({ indiceWms, porCam, semanaRef, programador, encarregado, setEncarregado }) => {
   const [fila, setFila] = useState('stc');
   const filas = useMemo(() => montarFilasExpedicao(indiceWms, porCam, hojeIso()), [indiceWms, porCam]);
   const { resumo } = filas;
@@ -260,6 +261,16 @@ const ExpedicaoPanel = ({ indiceWms, porCam }) => {
       <p className="text-[11px] text-slate-400 font-medium px-1">
         O tempo de espera é contado da conferência, não da inserção do documento: o WMS não guarda quando a STC foi lançada.
       </p>
+
+      {/* O documento vem por último, como na programação da semana: é a
+          última coisa que se faz depois de olhar as filas. */}
+      <DocumentoExpedicaoCard
+        filas={filas}
+        semanaRef={semanaRef}
+        programador={programador}
+        encarregado={encarregado}
+        setEncarregado={setEncarregado}
+      />
     </div>
   );
 };

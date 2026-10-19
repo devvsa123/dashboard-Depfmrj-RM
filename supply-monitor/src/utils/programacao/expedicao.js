@@ -1,5 +1,5 @@
 import { classifyStc } from '../../hooks/useStcGtcAnalysis';
-import { diffDias, hojeIso } from './semana';
+import { diffDias, hojeIso, diaDaSemana } from './semana';
 import { TRATAMENTOS, proximaRota, proximaJanela, nivelCobranca, configVazia } from './rotas';
 
 // A fila da Expedição — o trecho do processo que começa onde a
@@ -169,3 +169,42 @@ export const montarCobranca = (grupos) => {
     .map(d => ({ ...d, qtd: d.rms.length, nivel: nivelCobranca(d.dias) }))
     .sort((a, b) => b.dias - a.dias);
 };
+
+// ── O roteiro da semana ─────────────────────────────────────────────
+// A fila diz o que está parado; o roteiro diz em que dia cada coisa sai.
+// É o que a Expedição precisa ter na mão: o quadro da parede, só que
+// cruzado com o que de fato está conferido esperando.
+
+export const roteiroDaSemana = (filas, diasDaSemana) =>
+  (diasDaSemana || []).map(dia => {
+    const n = diaDaSemana(dia);
+    const cams = filas.gtc
+      .filter(g => g.config.diasRota?.includes(n) && (g.aProntificar.length + g.aEntregar.length) > 0)
+      .sort((a, b) => (b.aProntificar.length + b.aEntregar.length) - (a.aProntificar.length + a.aEntregar.length));
+    return {
+      dia,
+      cams,
+      aEntregar: cams.reduce((t, g) => t + g.aEntregar.length, 0),
+      aProntificar: cams.reduce((t, g) => t + g.aProntificar.length, 0)
+    };
+  });
+
+// CAMs de STC ordenados pela janela do CDAM, marcando os que precisam
+// fechar ainda nesta semana.
+export const janelasDaSemana = (filas, inicioSemana, fimSemana) =>
+  filas.stc
+    .filter(g => g.aProntificar.length > 0 || g.inseridas.length > 0)
+    .map(g => ({
+      ...g,
+      nestaSemana: Boolean(g.janela && g.janela.inicio <= fimSemana && g.janela.fim >= inicioSemana)
+    }))
+    // Ordena pelo fim da janela, não pelo fato de ela cair na semana do
+    // documento: o que fecha antes é o que precisa ser lançado antes,
+    // mesmo que a janela termine antes da semana começar — nesse caso o
+    // prazo já está correndo e atrasar significa esperar o mês seguinte.
+    .sort((a, b) => {
+      if (a.proximaSaida && b.proximaSaida && a.proximaSaida !== b.proximaSaida) return a.proximaSaida.localeCompare(b.proximaSaida);
+      if (a.proximaSaida && !b.proximaSaida) return -1;
+      if (!a.proximaSaida && b.proximaSaida) return 1;
+      return b.faltamFechar - a.faltamFechar;
+    });

@@ -121,7 +121,14 @@ const ProgramacaoTab = (p) => {
     )}
 
     {subaba === 'expedicao' ? (
-      <ExpedicaoPanel indiceWms={p.indiceWms} porCam={p.camConfig.porCam} />
+      <ExpedicaoPanel
+        indiceWms={p.indiceWms}
+        porCam={p.camConfig.porCam}
+        semanaRef={p.semanaRef}
+        programador={p.programador}
+        encarregado={p.encarregado}
+        setEncarregado={p.setEncarregado}
+      />
     ) : subaba === 'config' ? (
       <ConfigCamPanel
         linhas={p.camConfig.linhas}
