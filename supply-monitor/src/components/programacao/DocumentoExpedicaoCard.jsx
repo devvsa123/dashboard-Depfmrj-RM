@@ -1,16 +1,18 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { FileDown, Loader2, AlertCircle } from 'lucide-react';
 import InfoButton from '../InfoButton';
-import ExpedicaoDocument from './ExpedicaoDocument';
-import { gerarPdfProgramacao, PDF_CONTENT_WIDTH_PX } from '../../utils/programacao/pdfProgramacao';
-import { formatarBr, rotuloSemana, hojeIso } from '../../utils/programacao/semana';
+import { gerarPdfExpedicao } from '../../utils/programacao/documentoExpedicao';
+import { formatarBr, hojeIso } from '../../utils/programacao/semana';
 
 // Diferente do documento da programação, este não sai de uma versão
 // publicada: ele é uma fotografia do estado de agora. A Expedição não
 // negocia grade com ninguém — ela precisa saber o que está parado hoje,
 // então o que vale é o WMS do momento da emissão, com a data impressa.
+//
+// O PDF é escrito como texto (ver pdfTexto.js). Não há documento oculto
+// na tela para ser fotografado: com os números reais ele passa de
+// cinquenta páginas, e nenhum canvas de navegador aguenta isso.
 const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encarregado, setEncarregado, versao }) => {
-  const ref = useRef(null);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState('');
   const emitidoEm = formatarBr(hojeIso());
@@ -19,14 +21,10 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
     setGerando(true);
     setErro('');
     try {
-      await new Promise(r => setTimeout(r, 600));
-      // Mesmo sufixo do documento da separação: os dois saem juntos e
-      // precisam poder ser reconhecidos como o par de uma mesma versão.
-      const sufixo = versao ? `_${versao.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')}` : '';
-      await gerarPdfProgramacao(ref.current, {
-        filename: `Programacao_Expedicao_${semanaRef}${sufixo}.pdf`,
-        rodape: `DepFMRJ — Programação da Expedição — ${rotuloSemana(semanaRef)}${versao ? ` — ${versao}` : ''} — emitido em ${emitidoEm}`
-      });
+      // Cede um quadro ao navegador para o botão mostrar que está
+      // trabalhando antes da geração tomar a linha de execução.
+      await new Promise(r => setTimeout(r, 50));
+      gerarPdfExpedicao({ filas, projecao, semanaRef, programador, encarregado, versao, emitidoEm });
     } catch (e) {
       console.error(e);
       setErro('Não foi possível gerar o PDF. Tente novamente.');
@@ -45,7 +43,7 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
         {versao && <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{versao}</span>}
         <InfoButton
           title="O que sai no PDF"
-          description="O roteiro de entrega da semana por dia de rota, a prontificação de STC por janela do CDAM, as pendências de retirada que já passaram do prazo e os CAMs ainda sem rota cadastrada — mais o Anexo A, com a relação das RMs por CAM. É uma fotografia do WMS no momento da emissão, com a data impressa no rodapé."
+          description="A prontificação dia a dia, dividida em GTC e STC e em ordem de prioridade, derivada da programação da separação publicada; o fechamento das STC por janela do CDAM; as pendências de retirada que já passaram do prazo; e os CAMs ainda sem rota cadastrada — mais o Anexo A, com a relação das RMs por CAM, e o Anexo B, com os documentos parados esperando o CDAM. O texto do PDF é selecionável: dá para procurar uma RM pelo número."
         />
       </div>
 
@@ -85,20 +83,6 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
       )}
 
       {erro && <p className="flex items-center gap-2 text-red-600 text-xs font-bold"><AlertCircle size={14} /> {erro}</p>}
-
-      {/* Fora da tela, fixado na largura útil da página A4 — ver pdfReport.js. */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: PDF_CONTENT_WIDTH_PX, opacity: 0, zIndex: -1, pointerEvents: 'none' }} aria-hidden="true">
-        <ExpedicaoDocument
-          ref={ref}
-          filas={filas}
-          projecao={projecao}
-          semanaRef={semanaRef}
-          programador={programador}
-          encarregado={encarregado}
-          emitidoEm={emitidoEm}
-          versao={versao}
-        />
-      </div>
     </div>
   );
 };

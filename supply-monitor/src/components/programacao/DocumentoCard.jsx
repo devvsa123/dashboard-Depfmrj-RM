@@ -1,15 +1,13 @@
-import { useRef, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { FileDown, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import InfoButton from '../InfoButton';
-import ProgramacaoDocument from './ProgramacaoDocument';
-import { gerarPdfProgramacao, PDF_CONTENT_WIDTH_PX } from '../../utils/programacao/pdfProgramacao';
-import { formatarBr, rotuloSemana } from '../../utils/programacao/semana';
+import { gerarPdfSeparacao } from '../../utils/programacao/documentoSeparacao';
+import { formatarBr } from '../../utils/programacao/semana';
 import { compararVersoes, rotuloVersao } from '../../utils/programacao/versoes';
 
 // O documento sai sempre da versão PUBLICADA, nunca da proposta na tela —
 // senão o PDF impresso poderia divergir do que foi publicado.
 const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, programador, encarregado, setEncarregado }) => {
-  const ref = useRef(null);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -27,11 +25,17 @@ const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, program
     setGerando(true);
     setErro('');
     try {
-      await new Promise(r => setTimeout(r, 600));
-      const sufixo = ultimaVersao.numero === 0 ? 'Original' : `Alteracao_${ultimaVersao.numero}`;
-      await gerarPdfProgramacao(ref.current, {
-        filename: `Programacao_Semanal_${semanaRef}_${sufixo}.pdf`,
-        rodape: `DepFMRJ — Programação Semanal — ${rotuloSemana(semanaRef)} — ${versao}`
+      // Cede um quadro ao navegador para o botão mostrar que está
+      // trabalhando antes da geração tomar a linha de execução.
+      await new Promise(r => setTimeout(r, 50));
+      gerarPdfSeparacao({
+        snapshot: ultimaVersao.snapshot,
+        diff,
+        semanaRef,
+        programador,
+        encarregado,
+        versao,
+        emitidoEm
       });
     } catch (e) {
       console.error(e);
@@ -90,22 +94,6 @@ const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, program
 
       {erro && <p className="flex items-center gap-2 text-red-600 text-xs font-bold"><AlertCircle size={14} /> {erro}</p>}
 
-      {/* Documento estático, só para a captura do PDF. Fica na origem com
-          opacidade zero e fixado na largura útil da página A4 — renderizar
-          numa largura e capturar em outra corta o conteúdo na borda
-          direita (ver pdfReport.js). */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: PDF_CONTENT_WIDTH_PX, opacity: 0, zIndex: -1, pointerEvents: 'none' }} aria-hidden="true">
-        <ProgramacaoDocument
-          ref={ref}
-          snapshot={ultimaVersao?.snapshot}
-          diff={diff}
-          semanaRef={semanaRef}
-          programador={programador}
-          encarregado={encarregado}
-          versao={versao}
-          emitidoEm={emitidoEm}
-        />
-      </div>
     </div>
   );
 };
