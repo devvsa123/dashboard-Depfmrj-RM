@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, Send, AlertTriangle, CheckCircle2, Undo2, Loader2 } from 'lucide-react';
+import { History, Send, AlertTriangle, CheckCircle2, Undo2, Loader2, Trash2 } from 'lucide-react';
 import InfoButton from '../InfoButton';
 import { rotuloVersao } from '../../utils/programacao/versoes';
 import { formatarBr } from '../../utils/programacao/semana';
@@ -13,8 +13,9 @@ const dataHora = (iso) => {
 // publicação é uma ALTERAÇÃO, e o documento sai com o Anexo B dizendo o
 // que mudou — é o que permite reprogramar no meio da semana sem que quem
 // recebe perca o fio.
-const VersoesPanel = ({ versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao, programador, resultado }) => {
+const VersoesPanel = ({ versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao, apagarProgramacao, programador, resultado }) => {
   const [confirmando, setConfirmando] = useState(false);
+  const [apagando, setApagando] = useState(false);
   const [publicando, setPublicando] = useState(false);
 
   const proxima = versoes.length;
@@ -101,6 +102,31 @@ const VersoesPanel = ({ versoes, ultimaVersao, diffPendente, publicar, removerUl
           <p className="text-[11px] text-slate-400 font-medium">
             Semana publicada pela última vez em {formatarBr(ultimaVersao.publicadaEm.split('T')[0])}.
           </p>
+        )}
+
+        {/* Apagar a semana inteira. Fica separado do desfazer de uma
+            versão porque o efeito é outro: some tudo o que foi publicado
+            nesta semana, inclusive as alterações. */}
+        {versoes.length > 0 && (
+          apagando ? (
+            <div className="p-3 rounded-2xl bg-red-50 border border-red-100 space-y-2">
+              <p className="text-xs font-bold text-red-800">
+                Apagar as {versoes.length} versão(ões) publicadas desta semana? A programação volta a não existir e os
+                documentos já baixados deixam de ter respaldo no sistema.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => { apagarProgramacao(); setApagando(false); }} className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold">Apagar tudo</button>
+                <button onClick={() => setApagando(false)} className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold">Cancelar</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setApagando(true)}
+              className="w-full px-4 py-2 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs flex items-center justify-center gap-1.5 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-all"
+            >
+              <Trash2 size={14} /> Apagar a programação desta semana
+            </button>
+          )
         )}
       </div>
     </div>

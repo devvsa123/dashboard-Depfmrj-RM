@@ -73,6 +73,33 @@ export const Tabela = ({ colunas, linhas, rodape, quebravel, titulo }) => (
   </div>
 );
 
+// Relação de RMs em grade de colunas.
+//
+// Em texto corrido, separado por vírgula, oito dígitos seguidos de outros
+// oito viram um borrão: quem confere na doca perde a linha e tem de
+// recomeçar. Em coluna de largura fixa o olho desce em vez de varrer, e
+// a nota de cada RM (dias de espera, documento) fica à direita dela sem
+// encostar na seguinte.
+export const GradeDeRms = ({ itens, colunas = 5 }) => (
+  <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 2 }}>
+    {itens.map((it, i) => (
+      <div
+        key={`${it.rm}-${i}`}
+        style={{
+          flex: `0 0 ${(100 / colunas).toFixed(4)}%`,
+          minWidth: 0,
+          padding: '2px 8px 2px 0',
+          borderBottom: '1px solid #f1f5f9',
+          breakInside: 'avoid'
+        }}
+      >
+        <span className="text-[9px] font-bold text-slate-700">{it.rm}</span>
+        {it.nota && <span className="text-[8px] text-slate-400">  {it.nota}</span>}
+      </div>
+    ))}
+  </div>
+);
+
 // Área de assinatura. Nada de linha para assinar à mão: o DepFMRJ assina
 // com token no próprio PDF, então o que o documento precisa oferecer é um
 // retângulo limpo onde o carimbo digital cabe, com a identificação logo

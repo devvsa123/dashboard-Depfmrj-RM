@@ -2,7 +2,7 @@ import { forwardRef, Fragment } from 'react';
 import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana } from '../../utils/programacao/semana';
 import { ORIGENS, limiteDeSeparacao } from '../../utils/programacao/motor';
 import { agruparParaAnexo } from '../../utils/programacao/versoes';
-import { Secao, Titulo, Tabela, Assinaturas } from './pecasDoDocumento';
+import { Secao, Titulo, Tabela, Assinaturas, GradeDeRms } from './pecasDoDocumento';
 
 // -----------------------------------------------------------------------
 // Documento estático da programação semanal. Como o relatório mensal, não
@@ -30,6 +30,8 @@ const ehFila = (origem) => origem === 'FILA' || origem === 'ANTIGUIDADE';
 const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador, encarregado, versao, emitidoEm }, ref) => {
   if (!snapshot) return <div ref={ref} />;
   const { grade, porCam, resumo, alertas, bloqueios } = snapshot;
+  // Versões publicadas antes desta seção existir não trazem o campo.
+  const grades = snapshot.gradesConsideradas || [];
 
   // Grade por CAM: 5 dias + CAM + total. As larguras somam exatamente 100%.
   const colsCam = [
@@ -79,9 +81,14 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
     return { slot, grupos: Array.from(grupos.values()).sort((a, b) => b.rms.length - a.rms.length) };
   });
 
+  // A numeração das seções é automática: algumas só aparecem quando há
+  // conteúdo, e manter os números na mão já tinha produzido três
+  // expressões diferentes para a mesma conta.
+  let n = 0;
+  const num = () => String(++n);
   const secoes = [];
     secoes.push(<Secao>
-        <Titulo numero="1" texto="Resumo da Semana" />
+        <Titulo numero={num()} texto="Resumo da Semana" />
         <div style={{ display: 'flex', gap: 10 }}>
           {[
             { r: 'RMs programadas', v: resumo.totalProgramado },
@@ -105,12 +112,51 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
     </Secao>);
 
     secoes.push(<Secao quebravel>
-        <Titulo numero="2" texto="Grade de Atendimento por CAM" />
+        <Titulo numero={num()} texto="Grade de Atendimento por CAM" />
         <Tabela colunas={colsCam} linhas={linhasCam} rodape={rodapeCam} quebravel />
     </Secao>);
 
+      if (grades.length > 0)       secoes.push(<Secao quebravel>
+          <Titulo numero={num()} texto="Grades de Fornecimento Consideradas" />
+          <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
+            Para cada CAM da semana: a grade dele — dia de rota, no caso de entrega nossa, ou janela do CDAM, no caso de
+            retirada por terceiro —, até quando a separação precisava terminar e até que dia ela foi de fato programada.
+            O que aparece como &quot;fora do limite&quot; vai ficar pronto e esperar a saída seguinte.
+          </p>
+          <Tabela
+            quebravel
+            colunas={[
+              { key: 'cam', label: 'CAM', width: '30%', emphasis: true },
+              { key: 'grade', label: 'Grade de fornecimento', width: '26%' },
+              { key: 'limite', label: 'Separar até', width: '14%', align: 'center' },
+              { key: 'ultimo', label: 'Programado até', width: '15%', align: 'center' },
+              { key: 'qtd', label: 'RMs', width: '7%', align: 'center' },
+              { key: 'situacao', label: 'Situação', width: '8%', align: 'right' }
+            ]}
+            linhas={grades.map(g => ({
+              cam: g.sigla ? `${g.sigla} — ${g.cam}` : g.cam,
+              grade: g.tipo === 'GTC'
+                ? `Rota em ${formatarBr(g.saida)}`
+                : g.tipo === 'STC'
+                  ? `Janela do CDAM até ${formatarBr(g.saida)}`
+                  : 'sem grade cadastrada',
+              limite: g.limite ? formatarBr(g.limite) : '—',
+              ultimo: formatarBr(g.ultimoDia),
+              qtd: g.qtd,
+              situacao: g.dentro === null ? '—' : g.dentro ? 'no prazo' : 'fora'
+            }))}
+            rodape={{
+              cam: 'TOTAL',
+              grade: `${resumo.camsNoLimite ?? 0} no prazo · ${resumo.camsForaDoLimite ?? 0} fora · ${resumo.camsSemGrade ?? 0} sem grade`,
+              limite: '', ultimo: '',
+              qtd: grades.reduce((t, g) => t + g.qtd, 0),
+              situacao: ''
+            }}
+          />
+      </Secao>);
+
       if (bloqueios.length > 0)       secoes.push(<Secao>
-          <Titulo numero="3" texto="Dias sem Separação" />
+          <Titulo numero={num()} texto="Dias sem Separação" />
           <Tabela
             colunas={[
               { key: 'data', label: 'Data', width: '22%', emphasis: true },
@@ -126,7 +172,7 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
       </Secao>);
 
       if (comPrazo.length > 0)       secoes.push(<Secao>
-          <Titulo numero={bloqueios.length > 0 ? '4' : '3'} texto="Demandas com Prazo" />
+          <Titulo numero={num()} texto="Demandas com Prazo" />
           <Tabela
             colunas={[
               { key: 'ref', label: 'Origem / Referência', width: '36%', emphasis: true },
@@ -146,7 +192,7 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
       </Secao>);
 
       if (alertas.length > 0)       secoes.push(<Secao>
-          <Titulo numero={[bloqueios.length > 0, comPrazo.length > 0].filter(Boolean).length + 3} texto="Observações" />
+          <Titulo numero={num()} texto="Observações" />
           {alertas.map((a, i) => (
             <div key={i} style={{ borderLeft: `3px solid ${a.nivel === 'critico' ? '#dc2626' : '#d97706'}`, padding: '3px 0 3px 10px', marginBottom: 6, breakInside: 'avoid' }}>
               <p className="text-[10px] text-slate-700" style={{ lineHeight: '14px' }}>{a.texto}</p>
@@ -205,9 +251,7 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
                 <p className="text-[10px] font-bold text-slate-800">
                   {g.cam} — {g.rms.length} RM(s) · <span className="font-normal text-slate-500">{g.justificativa}</span>
                 </p>
-                <p className="text-[9px] text-slate-500" style={{ lineHeight: '13px', marginTop: 1, wordBreak: 'break-word' }}>
-                  {g.rms.join(', ')}
-                </p>
+                <GradeDeRms itens={g.rms.map(rm => ({ rm }))} colunas={6} />
               </div>
             ))}
           </div>

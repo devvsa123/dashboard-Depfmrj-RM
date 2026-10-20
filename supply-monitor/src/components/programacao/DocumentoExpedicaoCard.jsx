@@ -9,7 +9,7 @@ import { formatarBr, rotuloSemana, hojeIso } from '../../utils/programacao/seman
 // publicada: ele é uma fotografia do estado de agora. A Expedição não
 // negocia grade com ninguém — ela precisa saber o que está parado hoje,
 // então o que vale é o WMS do momento da emissão, com a data impressa.
-const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encarregado, setEncarregado }) => {
+const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encarregado, setEncarregado, versao }) => {
   const ref = useRef(null);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState('');
@@ -20,9 +20,12 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
     setErro('');
     try {
       await new Promise(r => setTimeout(r, 600));
+      // Mesmo sufixo do documento da separação: os dois saem juntos e
+      // precisam poder ser reconhecidos como o par de uma mesma versão.
+      const sufixo = versao ? `_${versao.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')}` : '';
       await gerarPdfProgramacao(ref.current, {
-        filename: `Programacao_Expedicao_${semanaRef}.pdf`,
-        rodape: `DepFMRJ — Programação da Expedição — ${rotuloSemana(semanaRef)} — emitido em ${emitidoEm}`
+        filename: `Programacao_Expedicao_${semanaRef}${sufixo}.pdf`,
+        rodape: `DepFMRJ — Programação da Expedição — ${rotuloSemana(semanaRef)}${versao ? ` — ${versao}` : ''} — emitido em ${emitidoEm}`
       });
     } catch (e) {
       console.error(e);
@@ -39,6 +42,7 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
       <div className="flex items-center gap-2">
         <FileDown className="text-indigo-500" size={20} />
         <h3 className="text-lg font-black text-slate-800">Documento da Expedição</h3>
+        {versao && <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{versao}</span>}
         <InfoButton
           title="O que sai no PDF"
           description="O roteiro de entrega da semana por dia de rota, a prontificação de STC por janela do CDAM, as pendências de retirada que já passaram do prazo e os CAMs ainda sem rota cadastrada — mais o Anexo A, com a relação das RMs por CAM. É uma fotografia do WMS no momento da emissão, com a data impressa no rodapé."
@@ -73,6 +77,13 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
         </button>
       </div>
 
+      {!projecao?.temPlano && (
+        <p className="text-[11px] text-amber-700 font-bold bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+          A semana ainda não foi publicada. Publique a programação da separação e os dois documentos passam a sair como
+          um par, da mesma versão.
+        </p>
+      )}
+
       {erro && <p className="flex items-center gap-2 text-red-600 text-xs font-bold"><AlertCircle size={14} /> {erro}</p>}
 
       {/* Fora da tela, fixado na largura útil da página A4 — ver pdfReport.js. */}
@@ -85,6 +96,7 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
           programador={programador}
           encarregado={encarregado}
           emitidoEm={emitidoEm}
+          versao={versao}
         />
       </div>
     </div>

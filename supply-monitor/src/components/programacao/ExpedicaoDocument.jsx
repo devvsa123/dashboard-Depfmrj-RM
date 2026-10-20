@@ -1,5 +1,5 @@
 import { forwardRef, Fragment } from 'react';
-import { Secao, Titulo, Tabela, Assinaturas } from './pecasDoDocumento';
+import { Secao, Titulo, Tabela, Assinaturas, GradeDeRms } from './pecasDoDocumento';
 import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana, diasUteisDaSemana } from '../../utils/programacao/semana';
 import { janelasDaSemana } from '../../utils/programacao/expedicao';
 import { rotaDescrita } from '../../utils/programacao/rotas';
@@ -16,7 +16,7 @@ import { rotaDescrita } from '../../utils/programacao/rotas';
 // no pátio à espera do CDAM.
 // -----------------------------------------------------------------------
 
-const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador, encarregado, emitidoEm }, ref) => {
+const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador, encarregado, emitidoEm, versao }, ref) => {
   if (!filas) return <div ref={ref} />;
 
   const dias = diasUteisDaSemana(semanaRef);
@@ -28,10 +28,12 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
   // está no prazo encheria a página de linha sem ação.
   const cobrar = filas.cobranca.filter(d => d.nivel.key !== 'verde');
 
+  let n = 0;
+  const num = () => String(++n);
   const secoes = [];
 
   secoes.push(<Secao>
-    <Titulo numero="1" texto="Situação da Expedição" />
+    <Titulo numero={num()} texto="Situação da Expedição" />
     <div style={{ display: 'flex', gap: 10 }}>
       {[
         { r: 'A prontificar', v: resumo.aProntificar },
@@ -70,8 +72,63 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
     atraso: g.atrasadas || '—'
   }));
 
+  // A grade: uma linha por CAM, uma coluna por dia. É a visão que se lê
+  // de longe, pregada na parede — o detalhe com a ordem de ataque vem na
+  // seção seguinte.
+  const montaGrade = (pegar) => {
+    const linhas = new Map();
+    blocos.forEach(bloco => pegar(bloco).forEach(g => {
+      if (!linhas.has(g.cam)) linhas.set(g.cam, { cam: g.cam, sigla: g.sigla, porDia: {}, total: 0 });
+      const l = linhas.get(g.cam);
+      const chave = bloco.dia || 'proxima';
+      l.porDia[chave] = (l.porDia[chave] || 0) + g.rms.length;
+      l.total += g.rms.length;
+    }));
+    return Array.from(linhas.values()).sort((a, b) => b.total - a.total);
+  };
+  const temProxima = blocos.some(b => b.proximaSemana);
+  const colunasGrade = [
+    { key: 'cam', label: 'CAM', width: temProxima ? '34%' : '40%', emphasis: true },
+    ...dias.map(d => ({ key: d, label: formatarCurto(d), width: temProxima ? '10%' : '11%', align: 'center' })),
+    ...(temProxima ? [{ key: 'proxima', label: 'Seg seg.', width: '10%', align: 'center' }] : []),
+    { key: 'total', label: 'Total', width: temProxima ? '6%' : '5%', align: 'right', emphasis: true }
+  ];
+  const linhasGrade = (linhas) => linhas.map(l => ({
+    cam: l.sigla === l.cam ? l.cam : `${l.sigla} — ${l.cam}`,
+    ...Object.fromEntries(dias.map(d => [d, l.porDia[d] || '—'])),
+    ...(temProxima ? { proxima: l.porDia.proxima || '—' } : {}),
+    total: l.total
+  }));
+  const rodapeGrade = (linhas) => ({
+    cam: 'TOTAL',
+    ...Object.fromEntries(dias.map(d => [d, linhas.reduce((t, l) => t + (l.porDia[d] || 0), 0) || '—'])),
+    ...(temProxima ? { proxima: linhas.reduce((t, l) => t + (l.porDia.proxima || 0), 0) || '—' } : {}),
+    total: linhas.reduce((t, l) => t + l.total, 0)
+  });
+
+  const gradeGtc = montaGrade(b => b.gtc);
+  const gradeStc = montaGrade(b => b.stc);
+  const gradeSem = montaGrade(b => b.semRota);
+
+  if (blocos.length > 0) secoes.push(<Secao quebravel>
+    <Titulo numero={num()} texto="Grade de Prontificação da Semana" />
+    <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
+      Quantas RMs de cada CAM a Expedição recebe em cada dia. GTC e STC vêm em blocos separados porque o trabalho é
+      diferente: a GTC termina no caminhão, a STC termina no lançamento do documento.
+    </p>
+    {[
+      { titulo: 'GTC — entrega nossa', linhas: gradeGtc },
+      { titulo: 'STC — lançar e aguardar o CDAM', linhas: gradeStc },
+      { titulo: 'Sem rota cadastrada', linhas: gradeSem }
+    ].filter(b => b.linhas.length > 0).map(b => (
+      <div key={b.titulo} style={{ marginBottom: 9 }}>
+        <Tabela titulo={b.titulo} colunas={colunasGrade} linhas={linhasGrade(b.linhas)} rodape={rodapeGrade(b.linhas)} quebravel />
+      </div>
+    ))}
+  </Secao>);
+
   secoes.push(<Secao quebravel>
-    <Titulo numero="2" texto="Prontificação Dia a Dia" />
+    <Titulo numero={num()} texto="Prontificação Dia a Dia" />
     <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
       O que a Expedição recebe em cada dia e em que ordem atacar. O que a separação conclui num dia fica disponível no
       dia útil seguinte — por isso o que for separado na sexta aparece na segunda. A ordem dentro do dia é a mesma régua
@@ -101,7 +158,7 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
   </Secao>);
 
   secoes.push(<Secao quebravel>
-    <Titulo numero="3" texto="Fechamento das STC por Janela do CDAM" />
+    <Titulo numero={num()} texto="Fechamento das STC por Janela do CDAM" />
     <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
       Para cada CAM, o processo só fecha quando a STC está lançada em todas as RM não canceladas. &quot;Faltam&quot; é o que ainda
       está conferido sem documento; a coluna seguinte mostra o que ainda depende da separação e entrará depois.
@@ -135,7 +192,7 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
   </Secao>);
 
   if (cobrar.length > 0) secoes.push(<Secao quebravel>
-    <Titulo numero="4" texto="Pendências de Retirada — Cobrar o CDAM" />
+    <Titulo numero={num()} texto="Pendências de Retirada — Cobrar o CDAM" />
     <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
       Documentos já lançados, com o material pronto e sem retirada. O prazo é contado da conferência. Até 7 dias a
       situação é normal; de 8 a 15 dias cabe aviso; acima de 15 dias cabe cobrança formal.
@@ -164,7 +221,7 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
   </Secao>);
 
   if (filas.semCadastro.length > 0) secoes.push(<Secao>
-    <Titulo numero={cobrar.length > 0 ? '5' : '4'} texto="CAMs sem Rota Cadastrada" />
+    <Titulo numero={num()} texto="CAMs sem Rota Cadastrada" />
     <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
       Têm material parado na Expedição mas ainda não foram classificados como entrega nossa ou retirada por terceiro.
       Enquanto isso não for definido, não entram no roteiro acima.
@@ -185,7 +242,19 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
 
   // Anexo: as RMs, por CAM. É o que a Expedição usa para conferir o que
   // tem em mãos contra o que o documento manda sair.
-  const anexo = [...filas.gtc, ...filas.stc, ...filas.semCadastro].filter(g => g.aProntificar.length + g.aEntregar.length > 0);
+  // Anexo A é o que a Expedição tem de FAZER. O que ela tem de COBRAR
+  // vai no Anexo B: são listas com donos diferentes, e misturá-las
+  // obrigava quem carrega o caminhão a folhear páginas de pendência do
+  // CDAM para achar a própria.
+  const anexo = [...filas.gtc, ...filas.stc, ...filas.semCadastro]
+    .filter(g => g.aProntificar.length + g.aEntregar.length > 0);
+
+  // Anexo B: documentos lançados esperando retirada, já fora do verde.
+  const anexoCobranca = cobrar.map(d => {
+    const grupo = filas.grupos.find(g => g.cam === d.cam);
+    const rms = (grupo?.inseridas || []).filter(l => String(l.documento || '').trim().toUpperCase() === String(d.documento || '').trim().toUpperCase());
+    return { ...d, rms };
+  }).filter(d => d.rms.length > 0);
 
   return (
     <div ref={ref} className="bg-white" style={{ fontFamily: 'Inter, system-ui, sans-serif', color: '#0f172a' }}>
@@ -195,7 +264,9 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
         <h1 className="text-base font-black text-slate-900 uppercase tracking-wide" style={{ marginTop: 8 }}>Programação da Expedição</h1>
         <p className="text-xs font-bold text-slate-600" style={{ marginTop: 2 }}>Semana de {rotuloSemana(semanaRef)}</p>
         <div style={{ display: 'inline-block', marginTop: 8, padding: '3px 14px', border: '1px solid #1e3a8a', borderRadius: 4 }}>
-          <span className="text-[10px] font-black text-blue-900 uppercase tracking-wide">Emitido em {emitidoEm}</span>
+          <span className="text-[10px] font-black text-blue-900 uppercase tracking-wide">
+            {versao ? `${versao} · emitido em ${emitidoEm}` : `Emitido em ${emitidoEm}`}
+          </span>
         </div>
         <div className="h-0.5 bg-slate-800" style={{ marginTop: 10 }} />
       </div>
@@ -214,33 +285,90 @@ const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador,
           <div style={{ textAlign: 'center', marginBottom: 18 }}>
             <h1 className="text-base font-black text-slate-900 uppercase tracking-wide">Anexo A — Relação das RMs por CAM</h1>
             <p className="text-[10px] text-slate-500" style={{ marginTop: 3 }}>
-              Semana de {rotuloSemana(semanaRef)} · emitido em {emitidoEm}
+              Semana de {rotuloSemana(semanaRef)}{versao ? ` · ${versao}` : ''} · emitido em {emitidoEm}
             </p>
             <div className="h-0.5 bg-slate-800" style={{ marginTop: 12 }} />
           </div>
           <p className="text-[10px] text-slate-600" style={{ marginBottom: 16, lineHeight: '15px' }}>
-            Cada RM com o número de dias desde a conferência. Serve para conferir o que está fisicamente na Expedição
-            contra o que este documento manda prontificar e entregar.
+            Por CAM: primeiro o que ainda não tem documento, com os dias de espera de cada RM; depois cada GTC já
+            lançada e ainda não expedida, com as RMs que ela carrega. Serve para conferir o que está fisicamente na
+            Expedição contra o que este documento manda prontificar e entregar. Os documentos que só dependem da
+            retirada estão no Anexo B.
           </p>
-          {anexo.map(g => (
-            <div key={g.cam} style={{ breakInside: 'avoid', marginBottom: 14 }}>
-              <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 4 }}>
-                {g.config.sigla ? `${g.config.sigla} — ` : ''}{g.cam}
-                <span className="font-bold text-slate-500"> · {g.tratamento === 'GTC' ? `entrega nossa, ${rotaDescrita(g.config)}` : `retirada por terceiro, ${rotaDescrita(g.config)}`}</span>
-              </p>
-              <div className="h-px bg-slate-300" style={{ marginBottom: 6 }} />
-              {g.aProntificar.length > 0 && (
-                <p className="text-[9px] text-slate-600" style={{ lineHeight: '13px', marginBottom: 4, wordBreak: 'break-word' }}>
-                  <strong className="text-slate-800">Sem documento ({g.aProntificar.length}):</strong>{' '}
-                  {g.aProntificar.map(l => `${l.rm} (${l.dias ?? '?'}d)`).join(', ')}
+          {anexo.map(g => {
+            // Agrupa por DOCUMENTO em vez de repetir o número da GTC ao
+            // lado de cada RM: numa GTC com 113 RMs, o número aparecia
+            // 113 vezes e o que importa — qual documento carregar — se
+            // perdia no meio dos oito dígitos.
+            const docs = new Map();
+            g.aEntregar.forEach(l => {
+              const chave = String(l.documento || '').trim() || '(sem número)';
+              if (!docs.has(chave)) docs.set(chave, { documento: chave, tipo: l.tipoDoc, rms: [], dias: 0 });
+              const d = docs.get(chave);
+              d.rms.push(l);
+              if ((l.dias ?? 0) > d.dias) d.dias = l.dias ?? 0;
+            });
+            const documentos = Array.from(docs.values()).sort((a, b) => b.rms.length - a.rms.length);
+
+            return (
+              <div key={g.cam} style={{ breakInside: 'avoid', marginBottom: 16 }}>
+                <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 4, breakAfter: 'avoid' }}>
+                  {g.config.sigla ? `${g.config.sigla} — ` : ''}{g.cam}
+                  <span className="font-bold text-slate-500"> · {g.tratamento === 'GTC' ? `entrega nossa, ${rotaDescrita(g.config)}` : `retirada por terceiro, ${rotaDescrita(g.config)}`}</span>
                 </p>
-              )}
-              {g.aEntregar.length > 0 && (
-                <p className="text-[9px] text-slate-600" style={{ lineHeight: '13px', wordBreak: 'break-word' }}>
-                  <strong className="text-slate-800">Com documento, a entregar ({g.aEntregar.length}):</strong>{' '}
-                  {g.aEntregar.map(l => `${l.rm} (${l.documento})`).join(', ')}
-                </p>
-              )}
+                <div className="h-px bg-slate-300" style={{ marginBottom: 6 }} />
+
+                {g.aProntificar.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <p className="text-[9px] font-bold text-slate-600 uppercase tracking-wide" style={{ marginBottom: 2 }}>
+                      Sem documento — {g.aProntificar.length} RM(s)
+                    </p>
+                    <GradeDeRms itens={g.aProntificar.map(l => ({ rm: l.rm, nota: l.dias != null ? `${l.dias}d` : '' }))} colunas={6} />
+                  </div>
+                )}
+
+                {documentos.map(d => (
+                  <div key={d.documento} style={{ marginBottom: 8, breakInside: 'avoid' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, borderBottom: '1px solid #cbd5e1', paddingBottom: 2, marginBottom: 2 }}>
+                      <span className="text-[11px] font-black text-slate-900">{d.documento}</span>
+                      <span className="text-[9px] font-bold text-slate-500">{d.tipo || ''}</span>
+                      <span className="text-[9px] text-slate-500">{d.rms.length} RM(s)</span>
+                      {d.dias > 0 && <span className="text-[9px] text-slate-400">parado há {d.dias} dias</span>}
+                    </div>
+                    <GradeDeRms itens={d.rms.map(l => ({ rm: l.rm }))} colunas={6} />
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ───────────────── ANEXO B ───────────────── */}
+      {anexoCobranca.length > 0 && (
+        <div style={{ breakBefore: 'page', paddingTop: 10 }}>
+          <div style={{ textAlign: 'center', marginBottom: 18 }}>
+            <h1 className="text-base font-black text-slate-900 uppercase tracking-wide">Anexo B — Documentos Aguardando Retirada</h1>
+            <p className="text-[10px] text-slate-500" style={{ marginTop: 3 }}>
+              Semana de {rotuloSemana(semanaRef)}{versao ? ` · ${versao}` : ''} · emitido em {emitidoEm}
+            </p>
+            <div className="h-0.5 bg-slate-800" style={{ marginTop: 12 }} />
+          </div>
+          <p className="text-[10px] text-slate-600" style={{ marginBottom: 16, lineHeight: '15px' }}>
+            Cada documento já lançado e parado há mais de 7 dias, com as RMs que ele carrega. É a lista de cobrança: o
+            material está pronto e o que falta não depende do depósito. Os documentos no prazo não entram aqui.
+          </p>
+          {anexoCobranca.map(d => (
+            <div key={d.documento} style={{ marginBottom: 10, breakInside: 'avoid' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, borderBottom: '1px solid #cbd5e1', paddingBottom: 2, marginBottom: 2 }}>
+                <span className="text-[11px] font-black text-slate-900">{d.documento}</span>
+                <span className="text-[9px] font-bold text-slate-500">{d.sigla}</span>
+                <span className="text-[9px] text-slate-500">{d.rms.length} RM(s)</span>
+                <span className="text-[9px] font-bold" style={{ color: d.nivel.key === 'vermelho' ? '#dc2626' : '#d97706' }}>
+                  parado há {d.dias} dias
+                </span>
+              </div>
+              <GradeDeRms itens={d.rms.map(l => ({ rm: l.rm }))} colunas={6} />
             </div>
           ))}
         </div>

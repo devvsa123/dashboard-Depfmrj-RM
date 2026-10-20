@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CalendarRange, Ban, Plus, Trash2, ChevronLeft, ChevronRight, AlertCircle, Loader2, Cloud, CloudOff, UserCircle2, LogOut } from 'lucide-react';
 import SectionLabel from '../SectionLabel';
 import CapacidadePanel from './CapacidadePanel';
@@ -9,8 +9,12 @@ import AcompanhamentoPanel from './AcompanhamentoPanel';
 import ConfigCamPanel from './ConfigCamPanel';
 import ForcarCamPanel from './ForcarCamPanel';
 import ExpedicaoPanel from './ExpedicaoPanel';
+import DocumentoExpedicaoCard from './DocumentoExpedicaoCard';
+import GradesPanel from './GradesPanel';
 import VersoesPanel from './VersoesPanel';
-import { rotuloSemana, somaDias, segundaDaSemana, formatarBr } from '../../utils/programacao/semana';
+import { rotuloSemana, somaDias, segundaDaSemana, formatarBr, diasUteisDaSemana, hojeIso } from '../../utils/programacao/semana';
+import { montarFilasExpedicao, projetarExpedicao } from '../../utils/programacao/expedicao';
+import { rotuloVersao } from '../../utils/programacao/versoes';
 
 const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
   const [data, setData] = useState('');
@@ -60,6 +64,27 @@ const SEM_SEMANA = new Set(['config', 'expedicao']);
 
 const ProgramacaoTab = (p) => {
   const [subaba, setSubaba] = useState('montagem');
+
+  // As filas da Expedição e a projeção da semana são calculadas aqui, e
+  // não dentro da aba da Expedição, porque os dois documentos — o da
+  // separação e o da Expedição — são emitidos no mesmo momento, na tela
+  // de montagem. Calcular nos dois lugares abriria espaço para eles
+  // divergirem, e um par de documentos assinados que não bate é pior do
+  // que não ter o segundo.
+  const filasExpedicao = useMemo(
+    () => montarFilasExpedicao(p.indiceWms, p.camConfig.porCam, hojeIso()),
+    [p.indiceWms, p.camConfig.porCam]
+  );
+  const projecaoExpedicao = useMemo(() => projetarExpedicao({
+    filas: filasExpedicao,
+    snapshot: p.ultimaVersao?.snapshot,
+    dias: diasUteisDaSemana(p.semanaRef),
+    porCam: p.camConfig.porCam,
+    forcados: p.forcados,
+    hoje: hojeIso()
+  }), [filasExpedicao, p.ultimaVersao, p.semanaRef, p.camConfig.porCam, p.forcados]);
+  const versaoAtual = p.ultimaVersao ? rotuloVersao(p.ultimaVersao.numero) : null;
+
   return (
   <div className="space-y-6 animate-in fade-in zoom-in duration-300">
     <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -123,14 +148,13 @@ const ProgramacaoTab = (p) => {
 
     {subaba === 'expedicao' ? (
       <ExpedicaoPanel
-        indiceWms={p.indiceWms}
-        porCam={p.camConfig.porCam}
+        filas={filasExpedicao}
+        projecao={projecaoExpedicao}
         semanaRef={p.semanaRef}
         programador={p.programador}
         encarregado={p.encarregado}
         setEncarregado={p.setEncarregado}
-        ultimaVersao={p.ultimaVersao}
-        forcados={p.forcados}
+        versao={versaoAtual}
       />
     ) : subaba === 'config' ? (
       <ConfigCamPanel
@@ -153,6 +177,8 @@ const ProgramacaoTab = (p) => {
     ) : (
     <>
     {p.resultado && <GradeSemanal resultado={p.resultado} />}
+
+    {p.resultado && <GradesPanel grades={p.resultado.gradesConsideradas} resumo={p.resultado.resumo} />}
 
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <DemandasPanel demandas={p.demandas} adicionarDemanda={p.adicionarDemanda} removerDemanda={p.removerDemanda} />
@@ -187,18 +213,30 @@ const ProgramacaoTab = (p) => {
         diffPendente={p.diffPendente}
         publicar={p.publicar}
         removerUltimaVersao={p.removerUltimaVersao}
+        apagarProgramacao={p.apagarProgramacao}
         programador={p.programador}
         resultado={p.resultado}
       />
-      <DocumentoCard
-        versoes={p.versoes}
-        ultimaVersao={p.ultimaVersao}
-        diffPendente={p.diffPendente}
-        semanaRef={p.semanaRef}
-        programador={p.programador}
-        encarregado={p.encarregado}
-        setEncarregado={p.setEncarregado}
-      />
+      <div className="space-y-6">
+        <DocumentoCard
+          versoes={p.versoes}
+          ultimaVersao={p.ultimaVersao}
+          diffPendente={p.diffPendente}
+          semanaRef={p.semanaRef}
+          programador={p.programador}
+          encarregado={p.encarregado}
+          setEncarregado={p.setEncarregado}
+        />
+        <DocumentoExpedicaoCard
+          filas={filasExpedicao}
+          projecao={projecaoExpedicao}
+          semanaRef={p.semanaRef}
+          programador={p.programador}
+          encarregado={p.encarregado}
+          setEncarregado={p.setEncarregado}
+          versao={versaoAtual}
+        />
+      </div>
     </div>
     </>
     )}

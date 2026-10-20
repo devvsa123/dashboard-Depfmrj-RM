@@ -231,6 +231,47 @@ export const programarSemana = ({
     }
   });
 
+  // ── A prestação de contas das grades de fornecimento ──────────────
+  //
+  // O programador precisa poder verificar, e não acreditar: para cada CAM
+  // da semana, qual é a grade dele (dia de rota ou janela do CDAM), até
+  // quando a separação tinha de terminar e até que dia ela de fato foi
+  // programada. Quando o último dia passa do limite, o material vai ficar
+  // pronto esperando a saída seguinte — e isso sai escrito, não implícito.
+  const gradesConsideradas = [];
+  if (rotas) {
+    const porCamGrade = new Map();
+    grade.forEach(slot => slot.alocacoes.forEach(a => {
+      const cam = a.cam || '(sem CAM)';
+      if (!porCamGrade.has(cam)) porCamGrade.set(cam, { cam, qtd: 0, ultimoDia: slot.dia });
+      const r = porCamGrade.get(cam);
+      r.qtd++;
+      if (slot.dia > r.ultimoDia) r.ultimoDia = slot.dia;
+    }));
+    porCamGrade.forEach(r => {
+      const config = rotas.get(r.cam);
+      const rota = prazoDaRota(config, dias[0]);
+      gradesConsideradas.push({
+        cam: r.cam,
+        sigla: config?.sigla || '',
+        tratamento: config?.tratamento || 'PENDENTE',
+        tipo: rota?.tipo || null,
+        saida: rota?.saida || null,
+        janelaInicio: rota?.janela?.inicio || null,
+        limite: rota?.conferirAte || null,
+        ultimoDia: r.ultimoDia,
+        qtd: r.qtd,
+        dentro: rota ? r.ultimoDia <= rota.conferirAte : null
+      });
+    });
+    gradesConsideradas.sort((a, b) => {
+      const peso = (x) => (x.dentro === null ? 1 : x.dentro ? 2 : 0);
+      if (peso(a) !== peso(b)) return peso(a) - peso(b);
+      if (a.saida && b.saida && a.saida !== b.saida) return a.saida.localeCompare(b.saida);
+      return b.qtd - a.qtd;
+    });
+  }
+
   const totalProgramado = grade.reduce((acc, g) => acc + g.alocacoes.length, 0);
   const capacidadeTotal = grade.reduce((acc, g) => acc + g.capacidade, 0);
 
@@ -249,6 +290,7 @@ export const programarSemana = ({
   return {
     dias,
     grade,
+    gradesConsideradas,
     porCam: Array.from(porCam.values()).sort((a, b) => b.total - a.total),
     naoAlocadas,
     alertas,
@@ -260,6 +302,9 @@ export const programarSemana = ({
       porAntiguidade: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'FILA').length, 0),
       porRota: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'ROTA' || a.origem === 'JANELA').length, 0),
       forcadas: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'FORCADO').length, 0),
+      camsNoLimite: gradesConsideradas.filter(g => g.dentro === true).length,
+      camsForaDoLimite: gradesConsideradas.filter(g => g.dentro === false).length,
+      camsSemGrade: gradesConsideradas.filter(g => g.dentro === null).length,
       camsAtendidos: porCam.size,
       filaTotal: fila.length,
       diasBloqueados: grade.filter(g => g.bloqueio).length,

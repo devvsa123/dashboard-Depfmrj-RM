@@ -244,6 +244,15 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
     comGravacao(() => armazem.apagarVersao(semanaRef, numero), 'a remoção da versão');
   }, [versoes, semanaRef, comGravacao]);
 
+  // Apaga tudo o que foi publicado nesta semana. Existe porque publicar
+  // a semana errada acontece, e desfazer uma versão por vez não resolve
+  // quando já são três.
+  const apagarProgramacao = useCallback(() => {
+    if (!versoes.length) return;
+    setVersoes([]);
+    comGravacao(() => armazem.apagarSemana(semanaRef), 'a remoção da programação da semana');
+  }, [versoes, semanaRef, comGravacao]);
+
   const forcarCam = useCallback((cam) => {
     if (!cam) return;
     setForcados(atual => {
@@ -263,7 +272,7 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
   }, [comGravacao]);
 
   return {
-    versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao,
+    versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao, apagarProgramacao,
     forcados, forcarCam, desforcarCam, simularForcar,
     semanaRef, setSemanaRef,
     demandas: demandasConferidas, adicionarDemanda, removerDemanda,

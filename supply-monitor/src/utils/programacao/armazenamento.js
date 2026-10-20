@@ -120,6 +120,15 @@ export const salvarVersao = async ({ semana, numero, por, usuarioId, snapshot })
   if (error) throw error;
 };
 
+// Apaga a semana inteira — todas as versões publicadas. É o botão de
+// desfazer de quem publicou a semana errada; o apagarVersao abaixo
+// desfaz só a última publicação.
+export const apagarSemana = async (semana) => {
+  if (semBanco()) return;
+  const { error } = await supabase.from('programacoes').delete().eq('semana', semana);
+  if (error) throw error;
+};
+
 export const apagarVersao = async (semana, numero) => {
   if (semBanco()) return;
   const { error } = await supabase.from('programacoes').delete().eq('semana', semana).eq('versao', numero);

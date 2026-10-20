@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react';
 import { Truck, PackageCheck, Clock, AlertTriangle, ChevronDown, ChevronRight, FileWarning, Settings2 } from 'lucide-react';
 import SectionLabel from '../SectionLabel';
 import DocumentoExpedicaoCard from './DocumentoExpedicaoCard';
-import { montarFilasExpedicao, projetarExpedicao } from '../../utils/programacao/expedicao';
 import { NIVEIS_COBRANCA, rotaDescrita } from '../../utils/programacao/rotas';
-import { formatarBr, hojeIso, diasUteisDaSemana, DIAS_SEMANA } from '../../utils/programacao/semana';
+import { formatarBr, DIAS_SEMANA } from '../../utils/programacao/semana';
 
 const TOM_TEXTO = { emerald: 'text-emerald-600', amber: 'text-amber-600', red: 'text-red-600', slate: 'text-slate-500', indigo: 'text-indigo-600' };
 const TOM_BADGE = {
@@ -172,19 +171,9 @@ const GrupoCam = ({ g, modo }) => {
 // Fila da Expedição: o que acontece depois do CONFERIDO. Três filas com
 // fins diferentes — prontificar, entregar e cobrar — porque só as duas
 // primeiras dependem de nós.
-const ExpedicaoPanel = ({ indiceWms, porCam, semanaRef, programador, encarregado, setEncarregado, ultimaVersao, forcados = [] }) => {
+const ExpedicaoPanel = ({ filas, projecao, semanaRef, programador, encarregado, setEncarregado, versao }) => {
   const [fila, setFila] = useState('agenda');
-  const filas = useMemo(() => montarFilasExpedicao(indiceWms, porCam, hojeIso()), [indiceWms, porCam]);
   const { resumo } = filas;
-
-  const projecao = useMemo(() => projetarExpedicao({
-    filas,
-    snapshot: ultimaVersao?.snapshot,
-    dias: diasUteisDaSemana(semanaRef),
-    porCam,
-    forcados,
-    hoje: hojeIso()
-  }), [filas, ultimaVersao, semanaRef, porCam, forcados]);
 
   // A fila da STC é ordenada pela janela do mês: quem fecha primeiro
   // aparece primeiro. A da GTC, pelo dia da rota, pelo mesmo motivo.
@@ -348,6 +337,7 @@ const ExpedicaoPanel = ({ indiceWms, porCam, semanaRef, programador, encarregado
         programador={programador}
         encarregado={encarregado}
         setEncarregado={setEncarregado}
+        versao={versao}
       />
     </div>
   );

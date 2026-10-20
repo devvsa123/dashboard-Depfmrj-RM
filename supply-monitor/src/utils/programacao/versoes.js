@@ -36,6 +36,10 @@ export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
     }))
   })),
   porCam: resultado.porCam,
+  // Vai para o snapshot porque é prova: a versão publicada precisa poder
+  // mostrar, meses depois, quais grades de fornecimento foram
+  // consideradas e quais não couberam.
+  gradesConsideradas: resultado.gradesConsideradas || [],
   resumo: resultado.resumo,
   alertas: resultado.alertas,
   bloqueios: bloqueios.map(b => ({ ...b })),
