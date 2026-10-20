@@ -271,6 +271,11 @@ export const criarDocumento = ({ rodape }) => {
   };
 
   // ── Rodapé, carimbado no fim em todas as páginas ──────────────────
+  //
+  // O salvamento tem um plano B: em navegador de celular o download
+  // programático às vezes é recusado — some o arquivo e sobra um erro
+  // genérico. Abrir o PDF numa aba nova passa pela mesma restrição e
+  // deixa o usuário salvar dali.
   const salvar = (nomeDoArquivo) => {
     const total = doc.internal.getNumberOfPages();
     for (let i = 1; i <= total; i++) {
@@ -281,7 +286,17 @@ export const criarDocumento = ({ rodape }) => {
       doc.text(rodape, MARGEM.esq, PAGINA.altura - 7, { baseline: 'alphabetic' });
       doc.text(`Página ${i} de ${total}`, PAGINA.largura - MARGEM.dir, PAGINA.altura - 7, { align: 'right', baseline: 'alphabetic' });
     }
-    doc.save(nomeDoArquivo);
+    try {
+      doc.save(nomeDoArquivo);
+    } catch (erroAoSalvar) {
+      const url = URL.createObjectURL(doc.output('blob'));
+      const aba = window.open(url, '_blank');
+      if (!aba) {
+        URL.revokeObjectURL(url);
+        throw erroAoSalvar;
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
   };
 
   return {

@@ -17,17 +17,17 @@ const DocumentoExpedicaoCard = ({ projecao, semanaRef, programador, encarregado,
   const [erro, setErro] = useState('');
   const emitidoEm = formatarBr(hojeIso());
 
-  const gerar = async () => {
-    setGerando(true);
+  // Síncrono e dentro do clique, de propósito: qualquer espera antes de
+  // salvar quebra o gesto do usuário, e navegador de celular recusa o
+  // download fora dele. A geração é imediata, então não há o que esperar.
+  const gerar = () => {
     setErro('');
+    setGerando(true);
     try {
-      // Cede um quadro ao navegador para o botão mostrar que está
-      // trabalhando antes da geração tomar a linha de execução.
-      await new Promise(r => setTimeout(r, 50));
       gerarPdfExpedicao({ projecao, semanaRef, programador, encarregado, versao, emitidoEm });
     } catch (e) {
       console.error(e);
-      setErro('Não foi possível gerar o PDF. Tente novamente.');
+      setErro(`Não foi possível gerar o PDF: ${e?.message || e}`);
     } finally {
       setGerando(false);
     }
