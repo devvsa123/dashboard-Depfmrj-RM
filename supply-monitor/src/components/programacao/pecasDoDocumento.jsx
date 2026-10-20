@@ -40,12 +40,21 @@ const estiloCol = (col) => ({
   wordBreak: 'break-word'
 });
 
-export const Tabela = ({ colunas, linhas, rodape, quebravel }) => (
+// O `titulo` entra DENTRO do bloco indivisível do cabeçalho, e não como
+// um parágrafo solto antes da tabela. Solto, o html2canvas o deixa
+// sozinho no pé da página com a tabela inteira na seguinte — breakAfter
+// não basta aqui, só a vizinhança indivisível resolve.
+export const Tabela = ({ colunas, linhas, rodape, quebravel, titulo }) => (
   <div style={{ breakInside: quebravel ? 'auto' : 'avoid', paddingBottom: 4 }}>
-    <div style={{ display: 'flex', borderBottom: '1.5px solid #334155', padding: '5px 8px', breakInside: 'avoid', breakAfter: 'avoid' }}>
-      {colunas.map(c => (
-        <div key={c.key} style={estiloCol(c)} className="text-slate-700 font-bold uppercase text-[9px] tracking-wide">{c.label}</div>
-      ))}
+    <div style={{ breakInside: 'avoid', breakAfter: 'avoid' }}>
+      {titulo && (
+        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wide" style={{ marginBottom: 3 }}>{titulo}</p>
+      )}
+      <div style={{ display: 'flex', borderBottom: '1.5px solid #334155', padding: '5px 8px' }}>
+        {colunas.map(c => (
+          <div key={c.key} style={estiloCol(c)} className="text-slate-700 font-bold uppercase text-[9px] tracking-wide">{c.label}</div>
+        ))}
+      </div>
     </div>
     {linhas.map((linha, i) => (
       <div key={i} style={{ display: 'flex', backgroundColor: i % 2 === 1 ? '#f8fafc' : 'transparent', borderBottom: '1px solid #e2e8f0', padding: '4px 8px', breakInside: 'avoid' }}>

@@ -10,8 +10,15 @@ import { ORIGENS } from './motor';
 // RMs e várias versões convivem no mesmo navegador.
 
 const ORIGEM_LABEL = Object.fromEntries(ORIGENS.map(o => [o.key, o.label]));
+ORIGEM_LABEL.FORCADO = 'Forçado pelo programador';
+// ANTIGUIDADE é o nome antigo de FILA. Versões publicadas antes da
+// mudança continuam no banco e precisam sair no documento do mesmo jeito.
 ORIGEM_LABEL.ANTIGUIDADE = 'Fila por antiguidade';
 ORIGEM_LABEL.ROTA = 'Rota do CAM';
+ORIGEM_LABEL.JANELA = 'Janela do CDAM';
+ORIGEM_LABEL.FILA = 'Fila por antiguidade';
+
+const ehFila = (origem) => origem === 'FILA' || origem === 'ANTIGUIDADE';
 
 export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
   grade: resultado.grade.map(s => ({
@@ -97,7 +104,7 @@ export const agruparParaAnexo = (itens) => {
   const grupos = new Map();
   itens.forEach(a => {
     const cam = a.cam || '(sem CAM)';
-    const chave = a.origem === 'ANTIGUIDADE' ? `ANTIGUIDADE||${cam}` : `${a.justificativa}||${cam}`;
+    const chave = ehFila(a.origem) ? `FILA||${cam}` : `${a.justificativa}||${cam}`;
     if (!grupos.has(chave)) {
       grupos.set(chave, { cam, origem: a.origem, justificativa: a.justificativa, rms: [], dias: [] });
     }
@@ -106,7 +113,7 @@ export const agruparParaAnexo = (itens) => {
     if (a.diasEmFila != null) g.dias.push(a.diasEmFila);
   });
   grupos.forEach(g => {
-    if (g.origem !== 'ANTIGUIDADE' || !g.dias.length) return;
+    if (!ehFila(g.origem) || !g.dias.length) return;
     const min = Math.min(...g.dias);
     const max = Math.max(...g.dias);
     g.justificativa = min === max

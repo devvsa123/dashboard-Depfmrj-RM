@@ -9,7 +9,7 @@ import { formatarBr, rotuloSemana, hojeIso } from '../../utils/programacao/seman
 // publicada: ele é uma fotografia do estado de agora. A Expedição não
 // negocia grade com ninguém — ela precisa saber o que está parado hoje,
 // então o que vale é o WMS do momento da emissão, com a data impressa.
-const DocumentoExpedicaoCard = ({ filas, semanaRef, programador, encarregado, setEncarregado }) => {
+const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encarregado, setEncarregado }) => {
   const ref = useRef(null);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState('');
@@ -58,7 +58,10 @@ const DocumentoExpedicaoCard = ({ filas, semanaRef, programador, encarregado, se
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-[11px] text-slate-400 font-medium">
-          {resumo.aProntificar + resumo.gtcAEntregar} RM(s) de trabalho da Expedição · {resumo.stcACobrar} aguardando retirada · emitido em {emitidoEm}
+          {projecao?.temPlano
+            ? `${projecao.resumo.total} RM(s) na agenda da semana — ${projecao.resumo.atrasadas} já conferidas e ${projecao.resumo.doPlano} vindas da separação`
+            : `${resumo.aProntificar + resumo.gtcAEntregar} RM(s) de trabalho da Expedição · semana ainda não publicada`}
+          {' '}· emitido em {emitidoEm}
         </p>
         <button
           onClick={gerar}
@@ -77,6 +80,7 @@ const DocumentoExpedicaoCard = ({ filas, semanaRef, programador, encarregado, se
         <ExpedicaoDocument
           ref={ref}
           filas={filas}
+          projecao={projecao}
           semanaRef={semanaRef}
           programador={programador}
           encarregado={encarregado}

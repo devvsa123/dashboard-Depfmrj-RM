@@ -20,6 +20,9 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
   const [janelaDias, setJanelaDias] = useState(365);
   const [encarregado, setEncarregado] = useState('');
   const [versoes, setVersoes] = useState([]);
+  // CAMs que o programador mandou atender na frente de todo mundo. Fica
+  // no config compartilhado: é uma decisão da semana, não do navegador.
+  const [forcados, setForcados] = useState([]);
 
   const [carregando, setCarregando] = useState(false);
   const [erroSync, setErroSync] = useState('');
@@ -45,7 +48,7 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
   useEffect(() => {
     if (!autenticado) {
       jaCarregou.current = false;
-      setDemandas([]); setBloqueios([]); setOverrides({}); setVersoes([]);
+      setDemandas([]); setBloqueios([]); setOverrides({}); setVersoes([]); setForcados([]);
       return;
     }
     if (jaCarregou.current) return;
@@ -60,6 +63,7 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
         setOverrides(o);
         if (c.janelaDias) setJanelaDias(Number(c.janelaDias));
         if (c.encarregado) setEncarregado(String(c.encarregado));
+        if (Array.isArray(c.forcados)) setForcados(c.forcados);
         setErroSync('');
       })
       .catch(e => {
@@ -93,24 +97,59 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
     return { ...d, conferencia, rmsEmFila: conferencia.EM_FILA };
   }), [demandas, indiceWms]);
 
+  // Os argumentos do motor ficam num lugar só para a simulação de
+  // "e se eu forçar este CAM?" rodar exatamente a mesma programação,
+  // mudando apenas a lista de forçados. Comparar duas execuções do mesmo
+  // motor é o que permite dizer, sem chutar, quem sai da grade.
+  const argumentosDoMotor = useCallback((forcadosAlvo) => ({
+    semanaRef,
+    demandas: demandasConferidas.map(d => ({
+      ...d,
+      origemLabel: ORIGENS.find(o => o.key === d.origem)?.label || d.origem,
+      rms: d.rmsEmFila
+    })),
+    fila,
+    capacidade: { porDiaSemana: capacidadeMedida?.porDiaSemana || {}, overrides },
+    bloqueios,
+    // O cadastro de rotas entra aqui: sem ele o motor volta a programar
+    // só por antiguidade, que é o comportamento de antes.
+    rotas: rotasPorCam,
+    forcados: forcadosAlvo,
+    hoje: hojeIso()
+  }), [semanaRef, demandasConferidas, fila, capacidadeMedida, overrides, bloqueios, rotasPorCam]);
+
   const resultado = useMemo(() => {
     if (!capacidadeMedida) return null;
-    return programarSemana({
-      semanaRef,
-      demandas: demandasConferidas.map(d => ({
-        ...d,
-        origemLabel: ORIGENS.find(o => o.key === d.origem)?.label || d.origem,
-        rms: d.rmsEmFila
-      })),
-      fila,
-      capacidade: { porDiaSemana: capacidadeMedida.porDiaSemana, overrides },
-      bloqueios,
-      // O cadastro de rotas entra aqui: sem ele o motor volta a programar
-      // só por antiguidade, que é o comportamento de antes.
-      rotas: rotasPorCam,
-      hoje: hojeIso()
-    });
-  }, [semanaRef, demandasConferidas, fila, capacidadeMedida, overrides, bloqueios, rotasPorCam]);
+    return programarSemana(argumentosDoMotor(forcados));
+  }, [argumentosDoMotor, capacidadeMedida, forcados]);
+
+  // O impacto de forçar um CAM, medido rodando a semana de novo com ele
+  // na frente e comparando com a grade atual.
+  const simularForcar = useCallback((cam) => {
+    if (!cam || !capacidadeMedida || !resultado) return null;
+    const alternativo = programarSemana(argumentosDoMotor([...forcados, cam]));
+    const antes = new Set(resultado.grade.flatMap(s => s.alocacoes.map(a => a.rm)));
+    const depois = new Set(alternativo.grade.flatMap(s => s.alocacoes.map(a => a.rm)));
+
+    const saindo = new Map();
+    resultado.grade.forEach(s => s.alocacoes.forEach(a => {
+      if (depois.has(a.rm)) return;
+      const c = a.cam || '(sem CAM)';
+      saindo.set(c, (saindo.get(c) || 0) + 1);
+    }));
+    const entrando = alternativo.grade.flatMap(s => s.alocacoes).filter(a => a.cam === cam && !antes.has(a.rm));
+
+    return {
+      cam,
+      entram: entrando.length,
+      jaEstavam: alternativo.grade.flatMap(s => s.alocacoes).filter(a => a.cam === cam).length - entrando.length,
+      saem: Array.from(saindo.values()).reduce((t, n) => t + n, 0),
+      camsAfetados: Array.from(saindo.entries()).map(([c, qtd]) => ({ cam: c, qtd })).sort((a, b) => b.qtd - a.qtd),
+      naFila: fila.filter(f => f.cam === cam).length,
+      totalProgramado: alternativo.resumo.totalProgramado,
+      capacidadeTotal: alternativo.resumo.capacidadeTotal
+    };
+  }, [argumentosDoMotor, capacidadeMedida, resultado, forcados, fila]);
 
   // ── Mutações ──────────────────────────────────────────────────────
   const adicionarDemanda = useCallback(({ texto, origem, referencia, prazo, diasExpedicao }) => {
@@ -205,8 +244,27 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
     comGravacao(() => armazem.apagarVersao(semanaRef, numero), 'a remoção da versão');
   }, [versoes, semanaRef, comGravacao]);
 
+  const forcarCam = useCallback((cam) => {
+    if (!cam) return;
+    setForcados(atual => {
+      if (atual.includes(cam)) return atual;
+      const nova = [...atual, cam];
+      comGravacao(() => armazem.salvarConfig('forcados', nova), 'a lista de CAMs forçados');
+      return nova;
+    });
+  }, [comGravacao]);
+
+  const desforcarCam = useCallback((cam) => {
+    setForcados(atual => {
+      const nova = atual.filter(c => c !== cam);
+      comGravacao(() => armazem.salvarConfig('forcados', nova), 'a lista de CAMs forçados');
+      return nova;
+    });
+  }, [comGravacao]);
+
   return {
     versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao,
+    forcados, forcarCam, desforcarCam, simularForcar,
     semanaRef, setSemanaRef,
     demandas: demandasConferidas, adicionarDemanda, removerDemanda,
     bloqueios, adicionarBloqueio, removerBloqueio,

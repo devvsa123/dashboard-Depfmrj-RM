@@ -7,8 +7,10 @@ const TOM_ORIGEM = {
   MENSAGEM: 'bg-indigo-100 text-indigo-700',
   GERENCIA: 'bg-violet-100 text-violet-700',
   OUTRO: 'bg-slate-100 text-slate-600',
-  ANTIGUIDADE: 'bg-slate-50 text-slate-500',
-  ROTA: 'bg-emerald-100 text-emerald-700'
+  FORCADO: 'bg-fuchsia-100 text-fuchsia-700',
+  ROTA: 'bg-emerald-100 text-emerald-700',
+  JANELA: 'bg-amber-100 text-amber-700',
+  FILA: 'bg-slate-50 text-slate-500'
 };
 
 const DetalheDia = ({ slot, onClose }) => {
@@ -43,7 +45,7 @@ const DetalheDia = ({ slot, onClose }) => {
                   <td className="px-3 py-2 text-xs">{a.cam || '—'}</td>
                   <td className="px-3 py-2 text-xs">
                     <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black mr-2 ${TOM_ORIGEM[a.origem]}`}>
-                      {a.origem === 'ANTIGUIDADE' ? 'ANTIGA' : a.origem}
+                      {a.origem === 'FILA' ? 'ANTIGA' : a.origem}
                     </span>
                     {a.justificativa}
                   </td>

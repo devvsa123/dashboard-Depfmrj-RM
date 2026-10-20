@@ -17,8 +17,15 @@ import { Secao, Titulo, Tabela, Assinaturas } from './pecasDoDocumento';
 // -----------------------------------------------------------------------
 
 const ORIGEM_LABEL = Object.fromEntries(ORIGENS.map(o => [o.key, o.label]));
+ORIGEM_LABEL.FORCADO = 'Forçado pelo programador';
+// ANTIGUIDADE é o nome antigo de FILA. Versões publicadas antes da
+// mudança continuam no banco e precisam sair no documento do mesmo jeito.
 ORIGEM_LABEL.ANTIGUIDADE = 'Fila por antiguidade';
 ORIGEM_LABEL.ROTA = 'Rota do CAM';
+ORIGEM_LABEL.JANELA = 'Janela do CDAM';
+ORIGEM_LABEL.FILA = 'Fila por antiguidade';
+
+const ehFila = (origem) => origem === 'FILA' || origem === 'ANTIGUIDADE';
 
 const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador, encarregado, versao, emitidoEm }, ref) => {
   if (!snapshot) return <div ref={ref} />;
@@ -53,7 +60,7 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
       // Na fila por antiguidade a justificativa carrega os dias de cada RM,
       // então agrupar por ela devolveria um grupo por RM. O que interessa
       // ali é o CAM e a faixa de espera, resumida depois.
-      const chave = a.origem === 'ANTIGUIDADE' ? `ANTIGUIDADE||${cam}` : `${a.justificativa}||${cam}`;
+      const chave = ehFila(a.origem) ? `FILA||${cam}` : `${a.justificativa}||${cam}`;
       if (!grupos.has(chave)) {
         grupos.set(chave, { justificativa: a.justificativa, cam, origem: a.origem, rms: [], dias: [] });
       }
@@ -62,7 +69,7 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
       if (a.diasEmFila != null) g.dias.push(a.diasEmFila);
     });
     grupos.forEach(g => {
-      if (g.origem !== 'ANTIGUIDADE' || !g.dias.length) return;
+      if (!ehFila(g.origem) || !g.dias.length) return;
       const min = Math.min(...g.dias);
       const max = Math.max(...g.dias);
       g.justificativa = min === max

@@ -1,7 +1,7 @@
 import { forwardRef, Fragment } from 'react';
 import { Secao, Titulo, Tabela, Assinaturas } from './pecasDoDocumento';
 import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana, diasUteisDaSemana } from '../../utils/programacao/semana';
-import { roteiroDaSemana, janelasDaSemana } from '../../utils/programacao/expedicao';
+import { janelasDaSemana } from '../../utils/programacao/expedicao';
 import { rotaDescrita } from '../../utils/programacao/rotas';
 
 // -----------------------------------------------------------------------
@@ -16,12 +16,12 @@ import { rotaDescrita } from '../../utils/programacao/rotas';
 // no pátio à espera do CDAM.
 // -----------------------------------------------------------------------
 
-const ExpedicaoDocument = forwardRef(({ filas, semanaRef, programador, encarregado, emitidoEm }, ref) => {
+const ExpedicaoDocument = forwardRef(({ filas, projecao, semanaRef, programador, encarregado, emitidoEm }, ref) => {
   if (!filas) return <div ref={ref} />;
 
   const dias = diasUteisDaSemana(semanaRef);
-  const roteiro = roteiroDaSemana(filas, dias);
   const janelas = janelasDaSemana(filas, dias[0], dias[dias.length - 1]);
+  const blocos = [...(projecao?.agenda || []), ...(projecao?.sobra ? [projecao.sobra] : [])];
   const { resumo } = filas;
 
   // Só o que já passou do verde entra na parte de cobrança: listar o que
@@ -54,40 +54,54 @@ const ExpedicaoDocument = forwardRef(({ filas, semanaRef, programador, encarrega
     </p>
   </Secao>);
 
+  const colunasDaOrdem = [
+    { key: 'ordem', label: '#', width: '6%', align: 'center' },
+    { key: 'cam', label: 'CAM', width: '34%', emphasis: true },
+    { key: 'porque', label: 'Por que nesta ordem', width: '42%' },
+    { key: 'rms', label: 'RMs', width: '9%', align: 'center' },
+    { key: 'atraso', label: 'Atrasadas', width: '9%', align: 'right' }
+  ];
+
+  const linhasDoBloco = (grupos) => grupos.map((g, i) => ({
+    ordem: `${i + 1}º`,
+    cam: g.sigla === g.cam ? g.cam : `${g.sigla} — ${g.cam}`,
+    porque: g.urgencia.texto,
+    rms: g.rms.length,
+    atraso: g.atrasadas || '—'
+  }));
+
   secoes.push(<Secao quebravel>
-    <Titulo numero="2" texto="Roteiro de Entrega da Semana (GTC)" />
+    <Titulo numero="2" texto="Prontificação Dia a Dia" />
     <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
-      Entregas feitas pelo depósito, no dia de rota já estabelecido para cada CAM. &quot;Sem documento&quot; é o que precisa de
-      mapa de carregamento e GTC antes da saída.
+      O que a Expedição recebe em cada dia e em que ordem atacar. O que a separação conclui num dia fica disponível no
+      dia útil seguinte — por isso o que for separado na sexta aparece na segunda. A ordem dentro do dia é a mesma régua
+      da separação: CAM forçado na frente, depois quem vence primeiro, antiguidade no fim.
+      {projecao?.temPlano ? '' : ' A programação da separação desta semana ainda não foi publicada, então abaixo consta apenas o que já está conferido esperando documento.'}
     </p>
-    {roteiro.every(d => d.cams.length === 0)
-      ? <p className="text-[10px] text-slate-500 italic">Nenhuma entrega nossa pendente nesta semana.</p>
-      : roteiro.filter(d => d.cams.length > 0).map(d => (
-          <div key={d.dia} style={{ breakInside: 'avoid', marginBottom: 12 }}>
-            <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 4 }}>
-              {DIAS_SEMANA[new Date(d.dia + 'T00:00:00Z').getUTCDay()]}, {formatarBr(d.dia)} — {d.cams.length} CAM(s), {d.aEntregar + d.aProntificar} RM(s)
+    {blocos.length === 0
+      ? <p className="text-[10px] text-slate-500 italic">Nada a prontificar nesta semana.</p>
+      : blocos.map(bloco => (
+          <div key={bloco.dia || 'proxima'} style={{ breakInside: 'avoid', marginBottom: 14 }}>
+            <p className="text-[11px] font-black text-slate-900 uppercase" style={{ marginBottom: 5, breakAfter: 'avoid' }}>
+              {bloco.proximaSemana
+                ? `Segunda seguinte — ${bloco.total} RM(s)`
+                : `${DIAS_SEMANA[new Date(bloco.dia + 'T00:00:00Z').getUTCDay()]}, ${formatarBr(bloco.dia)} — ${bloco.total} RM(s)`}
             </p>
-            <Tabela
-              colunas={[
-                { key: 'cam', label: 'CAM', width: '46%', emphasis: true },
-                { key: 'entregar', label: 'Com GTC', width: '18%', align: 'center' },
-                { key: 'prontificar', label: 'Sem documento', width: '20%', align: 'center' },
-                { key: 'espera', label: 'Mais antiga', width: '16%', align: 'right' }
-              ]}
-              linhas={d.cams.map(g => ({
-                cam: g.config.sigla ? `${g.config.sigla} — ${g.cam}` : g.cam,
-                entregar: g.aEntregar.length || '—',
-                prontificar: g.aProntificar.length || '—',
-                espera: g.maisAntiga != null ? `${g.maisAntiga} dias` : '—'
-              }))}
-              rodape={{ cam: 'TOTAL DO DIA', entregar: d.aEntregar, prontificar: d.aProntificar, espera: '' }}
-            />
+            {[
+              { titulo: 'GTC — entrega nossa', grupos: bloco.gtc },
+              { titulo: 'STC — lançar e aguardar o CDAM', grupos: bloco.stc },
+              { titulo: 'Sem rota cadastrada', grupos: bloco.semRota }
+            ].filter(b => b.grupos.length > 0).map(b => (
+              <div key={b.titulo} style={{ marginBottom: 7 }}>
+                <Tabela titulo={b.titulo} colunas={colunasDaOrdem} linhas={linhasDoBloco(b.grupos)} quebravel />
+              </div>
+            ))}
           </div>
         ))}
   </Secao>);
 
   secoes.push(<Secao quebravel>
-    <Titulo numero="3" texto="Prontificação de STC por Janela do CDAM" />
+    <Titulo numero="3" texto="Fechamento das STC por Janela do CDAM" />
     <p className="text-[10px] text-slate-600" style={{ marginBottom: 9, lineHeight: '15px' }}>
       Para cada CAM, o processo só fecha quando a STC está lançada em todas as RM não canceladas. &quot;Faltam&quot; é o que ainda
       está conferido sem documento; a coluna seguinte mostra o que ainda depende da separação e entrará depois.

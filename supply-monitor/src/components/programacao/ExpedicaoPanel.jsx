@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { Truck, PackageCheck, Clock, AlertTriangle, ChevronDown, ChevronRight, FileWarning, Settings2 } from 'lucide-react';
 import SectionLabel from '../SectionLabel';
 import DocumentoExpedicaoCard from './DocumentoExpedicaoCard';
-import { montarFilasExpedicao } from '../../utils/programacao/expedicao';
+import { montarFilasExpedicao, projetarExpedicao } from '../../utils/programacao/expedicao';
 import { NIVEIS_COBRANCA, rotaDescrita } from '../../utils/programacao/rotas';
-import { formatarBr, hojeIso } from '../../utils/programacao/semana';
+import { formatarBr, hojeIso, diasUteisDaSemana, DIAS_SEMANA } from '../../utils/programacao/semana';
 
 const TOM_TEXTO = { emerald: 'text-emerald-600', amber: 'text-amber-600', red: 'text-red-600', slate: 'text-slate-500', indigo: 'text-indigo-600' };
 const TOM_BADGE = {
@@ -16,6 +16,7 @@ const TOM_BADGE = {
 };
 
 const FILAS = [
+  { key: 'agenda', label: 'Agenda da semana', desc: 'O que prontificar em cada dia, na ordem — vem da programação da separação' },
   { key: 'stc', label: 'Prontificar STC', desc: 'Termina quando a STC está lançada em todas as RM não canceladas do CAM' },
   { key: 'gtc', label: 'Fornecer GTC', desc: 'Entrega nossa, por dia de rota — só termina em EXPEDIDO' },
   { key: 'cobranca', label: 'Cobrar a retirada', desc: 'Documento já lançado, aguardando o CDAM (ou a empresa) vir buscar — o que não depende de nós' }
@@ -39,6 +40,53 @@ const ListaRms = ({ rms, limite = 12 }) => {
           {tudo ? 'mostrar menos' : `ver as outras ${rms.length - limite}`}
         </button>
       )}
+    </div>
+  );
+};
+
+// Um dia da agenda: o que a Expedição recebe e em que ordem atacar.
+// GTC e STC aparecem separados porque o trabalho é diferente — um termina
+// no caminhão, o outro no lançamento da STC.
+const BlocoDoDia = ({ bloco }) => {
+  const secoes = [
+    { key: 'gtc', titulo: 'GTC — entrega nossa', grupos: bloco.gtc },
+    { key: 'stc', titulo: 'STC — lançar e aguardar o CDAM', grupos: bloco.stc },
+    { key: 'semRota', titulo: 'Sem rota cadastrada', grupos: bloco.semRota }
+  ].filter(s => s.grupos.length > 0);
+
+  return (
+    <div className="border-b border-slate-100 last:border-0">
+      <div className="px-5 py-3 bg-slate-50/70 flex items-center justify-between gap-3">
+        <p className="text-sm font-black text-slate-800">
+          {bloco.proximaSemana
+            ? 'Segunda seguinte'
+            : `${DIAS_SEMANA[new Date(bloco.dia + 'T00:00:00Z').getUTCDay()]}, ${formatarBr(bloco.dia)}`}
+        </p>
+        <p className="text-[11px] font-bold text-slate-400">{bloco.total} RM(s)</p>
+      </div>
+      {secoes.map(sec => (
+        <div key={sec.key} className="px-5 py-3">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{sec.titulo}</p>
+          <div className="space-y-1.5">
+            {sec.grupos.map((g, i) => (
+              <div key={g.cam} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
+                <span className="w-5 text-[11px] font-black text-slate-300 shrink-0">{i + 1}º</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">{g.sigla}</p>
+                  <p className="text-[11px] text-slate-400 font-medium truncate">{g.urgencia.texto}</p>
+                </div>
+                <span className={`text-[10px] font-black px-2 py-1 rounded-lg shrink-0 ${TOM_BADGE[g.urgencia.motivo.tom] || TOM_BADGE.slate}`}>
+                  {g.urgencia.motivo.curto}
+                </span>
+                {g.atrasadas > 0 && (
+                  <span className="text-[10px] font-bold text-amber-600 shrink-0 hidden sm:inline">{g.atrasadas} atrasada(s)</span>
+                )}
+                <span className="text-sm font-black text-slate-900 w-10 text-right shrink-0">{g.rms.length}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
@@ -124,10 +172,19 @@ const GrupoCam = ({ g, modo }) => {
 // Fila da Expedição: o que acontece depois do CONFERIDO. Três filas com
 // fins diferentes — prontificar, entregar e cobrar — porque só as duas
 // primeiras dependem de nós.
-const ExpedicaoPanel = ({ indiceWms, porCam, semanaRef, programador, encarregado, setEncarregado }) => {
-  const [fila, setFila] = useState('stc');
+const ExpedicaoPanel = ({ indiceWms, porCam, semanaRef, programador, encarregado, setEncarregado, ultimaVersao, forcados = [] }) => {
+  const [fila, setFila] = useState('agenda');
   const filas = useMemo(() => montarFilasExpedicao(indiceWms, porCam, hojeIso()), [indiceWms, porCam]);
   const { resumo } = filas;
+
+  const projecao = useMemo(() => projetarExpedicao({
+    filas,
+    snapshot: ultimaVersao?.snapshot,
+    dias: diasUteisDaSemana(semanaRef),
+    porCam,
+    forcados,
+    hoje: hojeIso()
+  }), [filas, ultimaVersao, semanaRef, porCam, forcados]);
 
   // A fila da STC é ordenada pela janela do mês: quem fecha primeiro
   // aparece primeiro. A da GTC, pelo dia da rota, pelo mesmo motivo.
@@ -201,6 +258,26 @@ const ExpedicaoPanel = ({ indiceWms, porCam, semanaRef, programador, encarregado
           <p className="text-sm text-slate-500 font-medium mt-0.5">{FILAS.find(f => f.key === fila).desc}</p>
         </div>
 
+        {fila === 'agenda' && (
+          <>
+            {!projecao.temPlano && (
+              <p className="px-6 py-4 text-sm text-amber-800 bg-amber-50 border-b border-amber-100 font-medium">
+                A programação da separação desta semana ainda não foi publicada. A agenda abaixo mostra só o que já está
+                conferido esperando — publique a semana em &quot;Montar a semana&quot; para ela passar a prever o que a
+                separação vai entregar em cada dia.
+              </p>
+            )}
+            {projecao.agenda.length === 0 && !projecao.sobra
+              ? <p className="px-6 py-10 text-center text-sm text-slate-400 italic">Nada a prontificar nesta semana.</p>
+              : (
+                <>
+                  {projecao.agenda.map(b => <BlocoDoDia key={b.dia} bloco={b} />)}
+                  {projecao.sobra && <BlocoDoDia bloco={projecao.sobra} />}
+                </>
+              )}
+          </>
+        )}
+
         {fila === 'stc' && (
           stcComTrabalho.length === 0
             ? <p className="px-6 py-10 text-center text-sm text-slate-400 italic">Nenhum CAM de STC com material esperando documento.</p>
@@ -266,6 +343,7 @@ const ExpedicaoPanel = ({ indiceWms, porCam, semanaRef, programador, encarregado
           última coisa que se faz depois de olhar as filas. */}
       <DocumentoExpedicaoCard
         filas={filas}
+        projecao={projecao}
         semanaRef={semanaRef}
         programador={programador}
         encarregado={encarregado}

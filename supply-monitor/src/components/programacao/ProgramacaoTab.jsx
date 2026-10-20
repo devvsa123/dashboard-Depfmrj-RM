@@ -7,6 +7,7 @@ import GradeSemanal from './GradeSemanal';
 import DocumentoCard from './DocumentoCard';
 import AcompanhamentoPanel from './AcompanhamentoPanel';
 import ConfigCamPanel from './ConfigCamPanel';
+import ForcarCamPanel from './ForcarCamPanel';
 import ExpedicaoPanel from './ExpedicaoPanel';
 import VersoesPanel from './VersoesPanel';
 import { rotuloSemana, somaDias, segundaDaSemana, formatarBr } from '../../utils/programacao/semana';
@@ -128,6 +129,8 @@ const ProgramacaoTab = (p) => {
         programador={p.programador}
         encarregado={p.encarregado}
         setEncarregado={p.setEncarregado}
+        ultimaVersao={p.ultimaVersao}
+        forcados={p.forcados}
       />
     ) : subaba === 'config' ? (
       <ConfigCamPanel
@@ -162,6 +165,16 @@ const ProgramacaoTab = (p) => {
           grade={p.resultado?.grade || []}
           overrides={p.overrides}
           definirOverride={p.definirOverride}
+        />
+        <ForcarCamPanel
+          fila={p.fila}
+          porCam={p.camConfig.porCam}
+          capacidadeMedida={p.capacidadeMedida}
+          semanaRef={p.semanaRef}
+          forcados={p.forcados}
+          forcarCam={p.forcarCam}
+          desforcarCam={p.desforcarCam}
+          simularForcar={p.simularForcar}
         />
         <BloqueiosPanel bloqueios={p.bloqueios} adicionarBloqueio={p.adicionarBloqueio} removerBloqueio={p.removerBloqueio} />
       </div>

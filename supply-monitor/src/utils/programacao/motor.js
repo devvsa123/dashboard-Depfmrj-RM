@@ -1,9 +1,13 @@
 import { diasUteisDaSemana, diaDaSemana, somaDiasUteis, formatarBr, diffDias } from './semana';
 import { prazoDaRota } from './rotas';
+import { urgenciaDe, porUrgencia } from './prioridade';
 
 // Motor de programação semanal.
 //
-// Duas filas disputam a mesma capacidade:
+// Três filas disputam a mesma capacidade:
+//   0. CAM FORÇADO pelo programador. Fura tudo, de propósito: demanda
+//      emergencial sai da lógica normal de fornecimento. O custo aparece
+//      na tela antes de forçar, e nos alertas depois.
 //   1. Demandas COM PRAZO (mensagem, gerência). Agendadas de trás para
 //      frente a partir do prazo, descontando os dias de expedição — o
 //      prazo é de EMI da STC, não de separação, então a separação precisa
@@ -23,11 +27,6 @@ export const ORIGENS = [
 ];
 
 export const DIAS_EXPEDICAO_PADRAO = 3;
-
-// Texto que explica, no documento, por que a RM entrou naquele dia.
-const justificativaDaRota = (rota) => (rota.tipo === 'GTC'
-  ? `Rota do CAM em ${formatarBr(rota.saida)} — conferir até ${formatarBr(rota.conferirAte)}`
-  : `Janela do CDAM até ${formatarBr(rota.janela.fim)} — conferir até ${formatarBr(rota.conferirAte)}`);
 
 // Último dia em que a separação pode terminar para o prazo ser cumprido.
 export const limiteDeSeparacao = (prazo, diasExpedicao) =>
@@ -50,6 +49,7 @@ export const programarSemana = ({
   capacidade = { porDiaSemana: {}, overrides: {} },
   bloqueios = [],
   rotas = null,
+  forcados = [],
   hoje
 }) => {
   const dias = diasUteisDaSemana(semanaRef);
@@ -71,6 +71,38 @@ export const programarSemana = ({
     jaAlocadas.add(registro.rm);
     return true;
   };
+
+  // ── Fila 0: CAM forçado pelo programador ──
+  //
+  // Vem antes até das demandas com prazo. É uma decisão consciente: o
+  // programador só força quando a demanda é emergencial, e o que ele
+  // perde ao fazer isso já apareceu na tela antes de confirmar. O motor
+  // não discute a ordem, mas registra o que ela custou.
+  const forcadosSet = new Set((forcados || []).filter(Boolean));
+  if (forcadosSet.size) {
+    const alvo = fila.filter(f => forcadosSet.has(f.cam) && !jaAlocadas.has(f.rm));
+    const naoCoube = new Map();
+    alvo.forEach(item => {
+      const slot = grade.find(g => !g.bloqueio && g.restante > 0);
+      if (!slot) {
+        naoCoube.set(item.cam, (naoCoube.get(item.cam) || 0) + 1);
+        naoAlocadas.push({ ...item, justificativa: 'Atendimento forçado pelo programador', motivo: 'SEM_CAPACIDADE' });
+        return;
+      }
+      alocar(slot.dia, { ...item, origem: 'FORCADO', justificativa: 'Atendimento forçado pelo programador' });
+    });
+    const forcadas = alvo.length - Array.from(naoCoube.values()).reduce((t, n) => t + n, 0);
+    if (forcadas > 0) {
+      alertas.push({
+        nivel: 'atencao',
+        texto: `${forcadas} RM(s) de ${Array.from(forcadosSet).join(', ')} foram programadas por ordem do programador, na frente da fila normal.`
+      });
+    }
+    naoCoube.forEach((qtd, cam) => alertas.push({
+      nivel: 'critico',
+      texto: `${qtd} RM(s) de ${cam} foram forçadas mas não cabem na capacidade da semana.`
+    }));
+  }
 
   // ── Fila 1: demandas com prazo, da mais apertada para a mais folgada ──
   const comPrazo = demandas
@@ -133,67 +165,68 @@ export const programarSemana = ({
 
   semPrazo.forEach(demanda => processaDemanda(demanda, null));
 
-  // ── Fila 2: as mais antigas preenchem o que sobrou ──
+  // ── Fila 2: o resto da fila, por urgência ──
   //
-  // Antiguidade continua mandando em QUEM entra. O que o cadastro de
-  // rotas muda é o DIA: separar na quinta o que sai na terça custa uma
+  // Antiguidade continua mandando em QUEM entra na semana. O cadastro de
+  // rotas muda o DIA: separar na quinta o que sai na terça custa uma
   // semana inteira de espera na Expedição, porque o caminhão daquele CAM
-  // já passou. Então quem tem rota saindo dentro da semana é alocado
-  // antes do dia da rota, e entre dois CAMs vale a rota que sai primeiro.
+  // já passou. Quem tem rota ou janela vencendo dentro da semana é
+  // alocado antes do seu limite; o resto entra por antiguidade.
   const antigas = fila.filter(f => !jaAlocadas.has(f.rm));
   const ultimoDia = dias[dias.length - 1];
-  const comRota = [];
-  const semRota = [];
-  antigas.forEach(item => {
+  const comUrgencia = antigas.map(item => {
     const rota = rotas ? prazoDaRota(rotas.get(item.cam), dias[0]) : null;
-    if (rota && rota.conferirAte >= dias[0] && rota.conferirAte <= ultimoDia) comRota.push({ ...item, rota });
-    else semRota.push(item);
+    const naSemana = rota && rota.conferirAte >= dias[0] && rota.conferirAte <= ultimoDia;
+    return { ...item, urgencia: urgenciaDe({ rota: naSemana ? rota : null, entrada: item.entrada, diasEmFila: item.diasEmFila }) };
   });
-  // A fila já vem ordenada por antiguidade e o sort é estável, então
-  // dentro de uma mesma data de rota a mais antiga continua na frente.
-  comRota.sort((a, b) => a.rota.conferirAte.localeCompare(b.rota.conferirAte));
+  // A fila já vem por antiguidade e o sort é estável, então dentro de um
+  // mesmo limite a mais antiga continua na frente.
+  comUrgencia.sort((a, b) => porUrgencia(a.urgencia, b.urgencia));
 
   const perderamARota = [];
-  comRota.forEach(item => {
-    const slot = grade.find(g => !g.bloqueio && g.restante > 0 && g.dia <= item.rota.conferirAte);
+  const semLimite = [];
+  comUrgencia.forEach(item => {
+    const limite = item.urgencia.limite;
+    if (!limite) { semLimite.push(item); return; }
+    const slot = grade.find(g => !g.bloqueio && g.restante > 0 && g.dia <= limite);
     if (!slot) { perderamARota.push(item); return; }
-    alocar(slot.dia, { ...item, origem: 'ROTA', justificativa: justificativaDaRota(item.rota) });
+    alocar(slot.dia, { ...item, origem: item.urgencia.motivo.key, justificativa: item.urgencia.texto });
   });
 
-  // Quem não coube antes da própria rota não some da semana: volta para a
-  // fila comum. Mas o programador precisa saber, porque é material que
-  // vai ficar pronto e esperar a rota da semana seguinte.
+  // Quem não coube antes do próprio limite não some da semana: volta para
+  // a fila comum. Mas o programador precisa saber, porque é material que
+  // vai ficar pronto e esperar a saída seguinte.
   //
-  // Um alerta por CAM encheria a tela: numa semana apertada quase todo CAM
-  // perde alguma coisa, e trinta avisos iguais não informam mais que um.
-  // Quando a capacidade da semana é zero o aviso nem aparece — o problema
-  // ali é a capacidade, que já está à vista.
+  // Um alerta por CAM encheria a tela: numa semana apertada quase todo
+  // CAM perde alguma coisa, e trinta avisos iguais não informam mais que
+  // um. Quando a capacidade da semana é zero o aviso nem aparece — o
+  // problema ali é a capacidade, que já está à vista.
   if (perderamARota.length && grade.some(g => g.capacidade > 0)) {
     const porCamPerdido = new Map();
     perderamARota.forEach(item => {
       const cam = item.cam || '(sem CAM)';
-      if (!porCamPerdido.has(cam)) porCamPerdido.set(cam, { cam, qtd: 0, rota: item.rota });
+      if (!porCamPerdido.has(cam)) porCamPerdido.set(cam, { cam, qtd: 0, urgencia: item.urgencia });
       porCamPerdido.get(cam).qtd++;
     });
     const lista = Array.from(porCamPerdido.values()).sort((a, b) => b.qtd - a.qtd);
     const primeiros = lista.slice(0, 3).map(g => `${g.cam} (${g.qtd})`).join(', ');
     alertas.push({
       nivel: 'atencao',
-      texto: `${perderamARota.length} RM(s) de ${lista.length} CAM(s) não cabem antes da própria rota e vão ficar prontas esperando a saída seguinte: ${primeiros}${lista.length > 3 ? ` e mais ${lista.length - 3}` : ''}.`
+      texto: `${perderamARota.length} RM(s) de ${lista.length} CAM(s) não cabem antes do próprio limite de rota ou janela e vão ficar prontas esperando a saída seguinte: ${primeiros}${lista.length > 3 ? ` e mais ${lista.length - 3}` : ''}.`
     });
   }
 
-  const sobraram = [...semRota, ...perderamARota];
+  const sobraram = [...semLimite, ...perderamARota];
   let idx = 0;
   grade.forEach(slot => {
     while (slot.restante > 0 && idx < sobraram.length) {
       const item = sobraram[idx++];
       alocar(slot.dia, {
         ...item,
-        origem: 'ANTIGUIDADE',
+        origem: 'FILA',
         justificativa: item.diasEmFila != null
-          ? `RM mais antiga em fila — ${item.diasEmFila} dias`
-          : 'RM em fila'
+          ? `Fila por antiguidade — ${item.diasEmFila} dias de espera`
+          : 'Fila por antiguidade'
       });
     }
   });
@@ -224,8 +257,9 @@ export const programarSemana = ({
       capacidadeTotal,
       ocupacao: capacidadeTotal ? Math.round((totalProgramado / capacidadeTotal) * 100) : 0,
       comPrazo: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.prazo).length, 0),
-      porAntiguidade: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'ANTIGUIDADE').length, 0),
-      porRota: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'ROTA').length, 0),
+      porAntiguidade: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'FILA').length, 0),
+      porRota: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'ROTA' || a.origem === 'JANELA').length, 0),
+      forcadas: grade.reduce((acc, g) => acc + g.alocacoes.filter(a => a.origem === 'FORCADO').length, 0),
       camsAtendidos: porCam.size,
       filaTotal: fila.length,
       diasBloqueados: grade.filter(g => g.bloqueio).length,
