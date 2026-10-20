@@ -3,7 +3,7 @@ import { FileDown, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import InfoButton from '../InfoButton';
 import { gerarPdfSeparacao } from '../../utils/programacao/documentoSeparacao';
 import { formatarBr } from '../../utils/programacao/semana';
-import { compararVersoes, rotuloVersao } from '../../utils/programacao/versoes';
+import { compararVersoes, rotuloVersao, dataDaPublicacao } from '../../utils/programacao/versoes';
 
 // O documento sai sempre da versão PUBLICADA, nunca da proposta na tela —
 // senão o PDF impresso poderia divergir do que foi publicado.
@@ -18,7 +18,7 @@ const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, program
   );
 
   const versao = ultimaVersao ? rotuloVersao(ultimaVersao.numero) : null;
-  const emitidoEm = ultimaVersao ? formatarBr(ultimaVersao.publicadaEm.split('T')[0]) : '';
+  const emitidoEm = ultimaVersao ? (formatarBr(dataDaPublicacao(ultimaVersao)) || '—') : '';
   const temPendencia = Boolean(diffPendente && diffPendente.totalMudancas > 0);
 
   const gerar = async () => {

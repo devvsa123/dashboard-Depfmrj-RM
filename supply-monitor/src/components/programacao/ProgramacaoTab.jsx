@@ -85,14 +85,16 @@ const ProgramacaoTab = (p) => {
     () => montarFilasExpedicao(p.indiceWms, p.camConfig.porCam, hojeIso()),
     [p.indiceWms, p.camConfig.porCam]
   );
+  // A projeção segue só as RMs da programação; as filas continuam
+  // servindo as outras abas, com o que ficou de trás.
   const projecaoExpedicao = useMemo(() => projetarExpedicao({
-    filas: filasExpedicao,
     snapshot: p.ultimaVersao?.snapshot,
+    indiceWms: p.indiceWms,
     dias: diasUteisDaSemana(p.semanaRef),
     porCam: p.camConfig.porCam,
     forcados: p.forcados,
     hoje: hojeIso()
-  }), [filasExpedicao, p.ultimaVersao, p.semanaRef, p.camConfig.porCam, p.forcados]);
+  }), [p.ultimaVersao, p.indiceWms, p.semanaRef, p.camConfig.porCam, p.forcados]);
   const versaoAtual = p.ultimaVersao ? rotuloVersao(p.ultimaVersao.numero) : null;
 
   return (

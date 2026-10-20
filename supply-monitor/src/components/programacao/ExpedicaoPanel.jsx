@@ -15,7 +15,7 @@ const TOM_BADGE = {
 };
 
 const FILAS = [
-  { key: 'agenda', label: 'Agenda da semana', desc: 'O que chega, o que sai e o que vence em cada dia — vem da programação da separação' },
+  { key: 'agenda', label: 'Agenda da semana', desc: 'Só as RMs desta programação: o que prontificar e o que entregar em cada dia' },
   { key: 'stc', label: 'Prontificar STC', desc: 'Termina quando a STC está lançada em todas as RM não canceladas do CAM' },
   { key: 'gtc', label: 'Fornecer GTC', desc: 'Entrega nossa, por dia de rota — só termina em EXPEDIDO' },
   { key: 'cobranca', label: 'Cobrar a retirada', desc: 'Documento já lançado, aguardando o CDAM (ou a empresa) vir buscar — o que não depende de nós' }
@@ -47,7 +47,7 @@ const ListaRms = ({ rms, limite = 12 }) => {
 // As três etapas vêm separadas porque são trabalhos diferentes — montar
 // mapa, carregar caminhão e lançar STC — e quem faz cada uma precisa ver
 // a sua lista sem ler as outras.
-const Etapa = ({ titulo, cor, blocos, coluna }) => {
+const Etapa = ({ titulo, cor, blocos, coluna, andamento }) => {
   if (!blocos.length) return null;
   return (
     <div className="px-5 py-3">
@@ -62,7 +62,7 @@ const Etapa = ({ titulo, cor, blocos, coluna }) => {
               <p className="text-[11px] text-slate-400 font-medium truncate">{coluna(b)}</p>
             </div>
             {b.forcado && <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-fuchsia-100 text-fuchsia-700 shrink-0">FORÇADO</span>}
-            {b.atrasadas > 0 && <span className="text-[10px] font-bold text-amber-600 shrink-0 hidden sm:inline">{b.atrasadas} atrasada(s)</span>}
+            {andamento && <span className="text-[10px] font-bold text-slate-400 shrink-0 hidden sm:inline">{andamento(b)}</span>}
             <span className="text-sm font-black text-slate-900 w-10 text-right shrink-0">{b.qtd}</span>
           </div>
         ))}
@@ -78,26 +78,18 @@ const BlocoDoDia = ({ bloco, rotulo, nota }) => (
       {nota && <p className="text-[11px] text-slate-400 font-medium">{nota}</p>}
     </div>
     <Etapa
-      titulo="Recebido da estocagem — prontificar"
-      cor="text-slate-500"
-      blocos={bloco.chegar}
-      coluna={b => `Prontificar até ${formatarBr(b.prazo)} · ${b.motivo}`}
+      titulo="Prontificar — lançar STC ou GTC"
+      cor="text-amber-600"
+      blocos={bloco.prontificar}
+      coluna={b => `Lançar ${b.documentoEsperado} até ${formatarBr(b.prazo)} · ${b.motivo}`}
+      andamento={b => (b.falta ? `faltam ${b.falta}` : 'tudo lançado')}
     />
     <Etapa
-      titulo="Entregar — GTC que saem"
+      titulo="Entregar — GTC que saem hoje"
       cor="text-emerald-600"
       blocos={bloco.entregar}
-      coluna={b => (b.documentos?.length
-        ? (b.documentos.length <= 2
-          ? `${b.documentos.map(x => x.documento).join(', ')} — lançada`
-          : `${b.documentos.length} documentos lançados`)
-        : 'documento a lançar antes da saída')}
-    />
-    <Etapa
-      titulo="Atender — STC que vencem hoje"
-      cor="text-amber-600"
-      blocos={bloco.atender}
-      coluna={b => (b.janela ? `Janela do CDAM até ${formatarBr(b.janela.fim)} · ${b.motivo}` : b.motivo)}
+      coluna={() => "Rota do CAM — fechar em EXPEDIDO"}
+      andamento={b => `${b.qtd - b.expedidas} a expedir`}
     />
   </div>
 );
@@ -356,7 +348,6 @@ const ExpedicaoPanel = ({ filas, projecao, semanaRef, programador, encarregado, 
       {/* O documento vem por último, como na programação da semana: é a
           última coisa que se faz depois de olhar as filas. */}
       <DocumentoExpedicaoCard
-        filas={filas}
         projecao={projecao}
         semanaRef={semanaRef}
         programador={programador}

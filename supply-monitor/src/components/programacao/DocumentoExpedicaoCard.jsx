@@ -12,7 +12,7 @@ import { formatarBr, hojeIso } from '../../utils/programacao/semana';
 // O PDF é escrito como texto (ver pdfTexto.js). Não há documento oculto
 // na tela para ser fotografado: com os números reais ele passa de
 // cinquenta páginas, e nenhum canvas de navegador aguenta isso.
-const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encarregado, setEncarregado, versao }) => {
+const DocumentoExpedicaoCard = ({ projecao, semanaRef, programador, encarregado, setEncarregado, versao }) => {
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState('');
   const emitidoEm = formatarBr(hojeIso());
@@ -24,7 +24,7 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
       // Cede um quadro ao navegador para o botão mostrar que está
       // trabalhando antes da geração tomar a linha de execução.
       await new Promise(r => setTimeout(r, 50));
-      gerarPdfExpedicao({ filas, projecao, semanaRef, programador, encarregado, versao, emitidoEm });
+      gerarPdfExpedicao({ projecao, semanaRef, programador, encarregado, versao, emitidoEm });
     } catch (e) {
       console.error(e);
       setErro('Não foi possível gerar o PDF. Tente novamente.');
@@ -32,8 +32,6 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
       setGerando(false);
     }
   };
-
-  const { resumo } = filas;
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
@@ -61,8 +59,8 @@ const DocumentoExpedicaoCard = ({ filas, projecao, semanaRef, programador, encar
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-[11px] text-slate-400 font-medium">
           {projecao?.temPlano
-            ? `${projecao.resumo.total} RM(s) na agenda da semana — ${projecao.resumo.atrasadas} já conferidas e ${projecao.resumo.doPlano} vindas da separação`
-            : `${resumo.aProntificar + resumo.gtcAEntregar} RM(s) de trabalho da Expedição · semana ainda não publicada`}
+            ? `${projecao.resumo.total} RM(s) programadas — ${projecao.resumo.aProntificar + projecao.resumo.naSeparacao} a prontificar, ${projecao.resumo.aEntregar} a expedir`
+            : 'Semana ainda não publicada'}
           {' '}· emitido em {emitidoEm}
         </p>
         <button

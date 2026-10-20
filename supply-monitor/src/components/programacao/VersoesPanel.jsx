@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { History, Send, AlertTriangle, CheckCircle2, Undo2, Loader2, Trash2 } from 'lucide-react';
 import InfoButton from '../InfoButton';
-import { rotuloVersao } from '../../utils/programacao/versoes';
+import { rotuloVersao, dataDaPublicacao } from '../../utils/programacao/versoes';
 import { formatarBr } from '../../utils/programacao/semana';
 
 const dataHora = (iso) => {
+  if (!iso) return '—';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
   return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 };
 
@@ -100,7 +102,7 @@ const VersoesPanel = ({ versoes, ultimaVersao, diffPendente, publicar, removerUl
 
         {ultimaVersao && (
           <p className="text-[11px] text-slate-400 font-medium">
-            Semana publicada pela última vez em {formatarBr(ultimaVersao.publicadaEm.split('T')[0])}.
+            Semana publicada pela última vez em {formatarBr(dataDaPublicacao(ultimaVersao)) || '—'}.
           </p>
         )}
 

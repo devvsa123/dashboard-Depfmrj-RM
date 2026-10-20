@@ -20,6 +20,15 @@ ORIGEM_LABEL.FILA = 'Fila por antiguidade';
 
 const ehFila = (origem) => origem === 'FILA' || origem === 'ANTIGUIDADE';
 
+// A data da publicação em ISO curto. No banco a coluna é not null com
+// default now(), mas a tela não pode morrer inteira se uma linha vier
+// sem ela — de uma restauração, de um insert na mão, de uma mudança de
+// schema. Vale um "—" no lugar de uma página em branco.
+export const dataDaPublicacao = (versao) => {
+  const bruta = versao?.publicadaEm;
+  return typeof bruta === 'string' && bruta.includes('T') ? bruta.split('T')[0] : (bruta || '');
+};
+
 export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
   grade: resultado.grade.map(s => ({
     dia: s.dia,

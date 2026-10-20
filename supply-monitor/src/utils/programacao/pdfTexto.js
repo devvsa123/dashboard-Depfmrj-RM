@@ -39,6 +39,7 @@ export const ZEBRA = [248, 250, 252];
 export const FUNDO_TOTAL = [226, 232, 240];
 export const VERMELHO = [185, 28, 28];
 export const AMBAR = [180, 83, 9];
+export const VERDE = [5, 122, 85];
 
 export const criarDocumento = ({ rodape }) => {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
