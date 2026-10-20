@@ -3,7 +3,7 @@ import { medirCapacidade, indexarWms, filaPorAntiguidade, JANELAS } from '../uti
 import { programarSemana, DIAS_EXPEDICAO_PADRAO, ORIGENS } from '../utils/programacao/motor';
 import { extrairRms, conferirRms } from '../utils/programacao/rms';
 import { montarSnapshot, compararVersoes } from '../utils/programacao/versoes';
-import { hojeIso, segundaDaSemana, somaDias } from '../utils/programacao/semana';
+import { hojeIso, segundaDaSemana, somaDias, diasUteisDaSemana } from '../utils/programacao/semana';
 import * as armazem from '../utils/programacao/armazenamento';
 
 // Estado da programação, compartilhado entre os três programadores pelo
@@ -20,9 +20,10 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
   const [janelaDias, setJanelaDias] = useState(365);
   const [encarregado, setEncarregado] = useState('');
   const [versoes, setVersoes] = useState([]);
-  // CAMs que o programador mandou atender na frente de todo mundo. Fica
-  // no config compartilhado: é uma decisão da semana, não do navegador.
-  const [forcados, setForcados] = useState([]);
+  // O config inteiro fica em estado porque algumas chaves são por semana
+  // — os CAMs forçados, por exemplo, são uma decisão daquela semana e
+  // não uma preferência do sistema.
+  const [config, setConfig] = useState({});
 
   const [carregando, setCarregando] = useState(false);
   const [erroSync, setErroSync] = useState('');
@@ -48,7 +49,7 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
   useEffect(() => {
     if (!autenticado) {
       jaCarregou.current = false;
-      setDemandas([]); setBloqueios([]); setOverrides({}); setVersoes([]); setForcados([]);
+      setDemandas([]); setBloqueios([]); setOverrides({}); setVersoes([]); setConfig({});
       return;
     }
     if (jaCarregou.current) return;
@@ -61,9 +62,9 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
         setDemandas(d);
         setBloqueios(b);
         setOverrides(o);
+        setConfig(c || {});
         if (c.janelaDias) setJanelaDias(Number(c.janelaDias));
         if (c.encarregado) setEncarregado(String(c.encarregado));
-        if (Array.isArray(c.forcados)) setForcados(c.forcados);
         setErroSync('');
       })
       .catch(e => {
@@ -92,10 +93,35 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
   const capacidadeMedida = useMemo(() => medirCapacidade(data, janelaDias), [data, janelaDias]);
   const fila = useMemo(() => filaPorAntiguidade(indiceWms, hojeIso()), [indiceWms]);
 
-  const demandasConferidas = useMemo(() => demandas.map(d => {
+  // ── O que pertence à semana que está na tela ──────────────────────
+  //
+  // Demanda, dia bloqueado e CAM forçado são decisões DAQUELA semana. Sem
+  // este recorte, uma mensagem colada numa semana reaparecia em todas as
+  // seguintes e o programador abria a semana nova já suja — pior ainda,
+  // as RMs voltavam a ser programadas e o documento saía com dias sem
+  // separação que não eram daquela semana.
+  const diasDaSemana = useMemo(() => diasUteisDaSemana(semanaRef), [semanaRef]);
+
+  const demandasDaSemana = useMemo(
+    () => demandas.filter(d => d.semana === semanaRef),
+    [demandas, semanaRef]
+  );
+
+  const bloqueiosDaSemana = useMemo(
+    () => bloqueios.filter(b => b.data >= diasDaSemana[0] && b.data <= diasDaSemana[diasDaSemana.length - 1]),
+    [bloqueios, diasDaSemana]
+  );
+
+  const chaveForcados = `forcados:${semanaRef}`;
+  const forcados = useMemo(() => {
+    const v = config[chaveForcados];
+    return Array.isArray(v) ? v : [];
+  }, [config, chaveForcados]);
+
+  const demandasConferidas = useMemo(() => demandasDaSemana.map(d => {
     const conferencia = conferirRms(d.rms || [], indiceWms);
     return { ...d, conferencia, rmsEmFila: conferencia.EM_FILA };
-  }), [demandas, indiceWms]);
+  }), [demandasDaSemana, indiceWms]);
 
   // Os argumentos do motor ficam num lugar só para a simulação de
   // "e se eu forçar este CAM?" rodar exatamente a mesma programação,
@@ -110,13 +136,13 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
     })),
     fila,
     capacidade: { porDiaSemana: capacidadeMedida?.porDiaSemana || {}, overrides },
-    bloqueios,
+    bloqueios: bloqueiosDaSemana,
     // O cadastro de rotas entra aqui: sem ele o motor volta a programar
     // só por antiguidade, que é o comportamento de antes.
     rotas: rotasPorCam,
     forcados: forcadosAlvo,
     hoje: hojeIso()
-  }), [semanaRef, demandasConferidas, fila, capacidadeMedida, overrides, bloqueios, rotasPorCam]);
+  }), [semanaRef, demandasConferidas, fila, capacidadeMedida, overrides, bloqueiosDaSemana, rotasPorCam]);
 
   const resultado = useMemo(() => {
     if (!capacidadeMedida) return null;
@@ -162,13 +188,14 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
       prazo: prazo || null,
       diasExpedicao: Number(diasExpedicao) || DIAS_EXPEDICAO_PADRAO,
       rms,
+      semana: semanaRef,
       criadaEm: new Date().toISOString(),
       criadaPorNome: auth?.nome || ''
     };
     setDemandas(a => [...a, nova]);
     comGravacao(() => armazem.salvarDemanda(nova), 'a demanda');
     return { ok: true, encontradas: rms.length, duplicadas, totalEncontrado };
-  }, [auth?.nome, comGravacao]);
+  }, [auth?.nome, comGravacao, semanaRef]);
 
   const removerDemanda = useCallback((id) => {
     setDemandas(a => a.filter(d => d.id !== id));
@@ -204,6 +231,7 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
 
   const mudarEncarregado = useCallback((nome) => {
     setEncarregado(nome);
+    setConfig(c => ({ ...c, encarregado: nome }));
     comGravacao(() => armazem.salvarConfig('encarregado', nome), 'o nome do Encarregado');
   }, [comGravacao]);
 
@@ -211,8 +239,10 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
   const ultimaVersao = versoes.length ? versoes[versoes.length - 1] : null;
 
   const snapshotAtual = useMemo(
-    () => (resultado ? montarSnapshot({ resultado, bloqueios, demandas: demandasConferidas }) : null),
-    [resultado, bloqueios, demandasConferidas]
+    // Bloqueios da SEMANA, não todos: antes o documento saía com dias
+    // sem separação que pertenciam a outras semanas.
+    () => (resultado ? montarSnapshot({ resultado, bloqueios: bloqueiosDaSemana, demandas: demandasConferidas }) : null),
+    [resultado, bloqueiosDaSemana, demandasConferidas]
   );
 
   const diffPendente = useMemo(
@@ -253,30 +283,27 @@ export const useProgramacao = (data, auth, rotasPorCam = null) => {
     comGravacao(() => armazem.apagarSemana(semanaRef), 'a remoção da programação da semana');
   }, [versoes, semanaRef, comGravacao]);
 
+  const guardarForcados = useCallback((nova) => {
+    setConfig(c => ({ ...c, [chaveForcados]: nova }));
+    comGravacao(() => armazem.salvarConfig(chaveForcados, nova), 'a lista de CAMs forçados');
+  }, [chaveForcados, comGravacao]);
+
   const forcarCam = useCallback((cam) => {
-    if (!cam) return;
-    setForcados(atual => {
-      if (atual.includes(cam)) return atual;
-      const nova = [...atual, cam];
-      comGravacao(() => armazem.salvarConfig('forcados', nova), 'a lista de CAMs forçados');
-      return nova;
-    });
-  }, [comGravacao]);
+    if (!cam || forcados.includes(cam)) return;
+    guardarForcados([...forcados, cam]);
+  }, [forcados, guardarForcados]);
 
   const desforcarCam = useCallback((cam) => {
-    setForcados(atual => {
-      const nova = atual.filter(c => c !== cam);
-      comGravacao(() => armazem.salvarConfig('forcados', nova), 'a lista de CAMs forçados');
-      return nova;
-    });
-  }, [comGravacao]);
+    guardarForcados(forcados.filter(c => c !== cam));
+  }, [forcados, guardarForcados]);
 
   return {
     versoes, ultimaVersao, diffPendente, publicar, removerUltimaVersao, apagarProgramacao,
     forcados, forcarCam, desforcarCam, simularForcar,
     semanaRef, setSemanaRef,
     demandas: demandasConferidas, adicionarDemanda, removerDemanda,
-    bloqueios, adicionarBloqueio, removerBloqueio,
+    bloqueios: bloqueiosDaSemana, adicionarBloqueio, removerBloqueio,
+    diasDaSemana,
     overrides, definirOverride,
     janelaDias, setJanelaDias: mudarJanela, janelas: JANELAS,
     programador: auth?.nome || '', encarregado, setEncarregado: mudarEncarregado,

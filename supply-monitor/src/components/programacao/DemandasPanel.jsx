@@ -37,9 +37,10 @@ const DemandasPanel = ({ demandas, adicionarDemanda, removerDemanda }) => {
       <div className="p-6 border-b border-slate-100 flex items-center gap-2">
         <ClipboardPaste className="text-indigo-500" size={20} />
         <h3 className="text-lg font-black text-slate-800">Demandas com Prazo</h3>
+        <span className="text-[10px] font-bold text-slate-400 ml-auto">nesta semana</span>
         <InfoButton
           title="Como registrar uma demanda"
-          description="Cole a relação de RMs direto da mensagem, do e-mail ou de onde ela veio — o sistema procura os números de 8 dígitos e ignora o resto do texto, então não precisa limpar nada. Informe o prazo que a origem cobrou (a data de emissão da STC, por exemplo) e quantos dias úteis a expedição precisa depois da separação. O motor agenda de trás para frente a partir daí. Sem prazo, a demanda entra como prioridade sobre a fila por antiguidade, mas sem data limite."
+          description="A demanda fica presa à semana em que você a registra: ao navegar para outra semana, a lista volta a ser a daquela semana. Cole a relação de RMs direto da mensagem, do e-mail ou de onde ela veio — o sistema procura os números de 8 dígitos e ignora o resto do texto, então não precisa limpar nada. Informe o prazo que a origem cobrou (a data de emissão da STC, por exemplo) e quantos dias úteis a expedição precisa depois da separação. O motor agenda de trás para frente a partir daí. Sem prazo, a demanda entra como prioridade sobre a fila por antiguidade, mas sem data limite."
         />
       </div>
 
@@ -90,7 +91,7 @@ const DemandasPanel = ({ demandas, adicionarDemanda, removerDemanda }) => {
 
       <div className="divide-y divide-slate-50">
         {demandas.length === 0 && (
-          <p className="px-6 py-8 text-center text-sm text-slate-400 italic">Nenhuma demanda registrada. A semana será montada só pela fila de mais antigas.</p>
+          <p className="px-6 py-8 text-center text-sm text-slate-400 italic">Nenhuma demanda registrada para esta semana. Ela será montada só pela fila de mais antigas.</p>
         )}
         {demandas.map(d => {
           const c = d.conferencia;

@@ -39,9 +39,24 @@ create table if not exists public.demandas (
   prazo            date,
   dias_expedicao   integer not null default 3,
   rms              text[] not null default '{}',
+  semana           date,
   criada_em        timestamptz not null default now(),
   criada_por_nome  text not null default ''
 );
+
+-- A demanda pertence à SEMANA em que foi registrada. Sem isso, uma
+-- mensagem colada numa semana reaparecia em todas as seguintes, e o
+-- programador via a tela de outra semana já preenchida.
+alter table public.demandas add column if not exists semana date;
+
+-- Linhas antigas, de antes da coluna existir: ficam na semana para a
+-- qual foram criadas. A tela abre por padrão na semana seguinte à da
+-- criação, então é essa a segunda-feira que reproduz o que foi feito.
+update public.demandas
+   set semana = (date_trunc('week', criada_em + interval '7 days'))::date
+ where semana is null;
+
+create index if not exists demandas_semana_idx on public.demandas (semana);
 
 -- ---------------------------------------------------------------------
 -- Dias sem separação, com o motivo que vai impresso no documento.

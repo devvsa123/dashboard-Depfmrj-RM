@@ -31,6 +31,7 @@ export const carregarTudo = async () => {
       prazo: linha.prazo || null,
       diasExpedicao: linha.dias_expedicao,
       rms: linha.rms || [],
+      semana: linha.semana || null,
       criadaEm: linha.criada_em,
       criadaPorNome: linha.criada_por_nome || ''
     })),
@@ -49,6 +50,7 @@ export const salvarDemanda = async (d) => {
     prazo: d.prazo,
     dias_expedicao: d.diasExpedicao,
     rms: d.rms,
+    semana: d.semana,
     criada_por_nome: d.criadaPorNome || ''
   });
   if (error) throw error;

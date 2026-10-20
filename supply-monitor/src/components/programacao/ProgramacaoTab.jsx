@@ -16,7 +16,7 @@ import { rotuloSemana, somaDias, segundaDaSemana, formatarBr, diasUteisDaSemana,
 import { montarFilasExpedicao, projetarExpedicao } from '../../utils/programacao/expedicao';
 import { rotuloVersao } from '../../utils/programacao/versoes';
 
-const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
+const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio, diasDaSemana = [] }) => {
   const [data, setData] = useState('');
   const [motivo, setMotivo] = useState('');
   return (
@@ -24,9 +24,19 @@ const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio }) => {
       <div className="p-6 border-b border-slate-100 flex items-center gap-2">
         <Ban className="text-red-500" size={20} />
         <h3 className="text-lg font-black text-slate-800">Dias sem Separação</h3>
+        <span className="text-[10px] font-bold text-slate-400 ml-auto">nesta semana</span>
       </div>
       <div className="p-6 flex flex-col sm:flex-row gap-3 border-b border-slate-100 bg-slate-50/50">
-        <input type="date" value={data} onChange={e => setData(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-500" />
+        {/* Limitado à semana programada: um dia bloqueado fora dela não
+            afeta esta grade e some da lista assim que a semana muda. */}
+        <input
+          type="date"
+          value={data}
+          min={diasDaSemana[0]}
+          max={diasDaSemana[diasDaSemana.length - 1]}
+          onChange={e => setData(e.target.value)}
+          className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-indigo-500"
+        />
         <input value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Motivo (feriado, licença, inventário...)" className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-500" />
         <button
           onClick={() => { adicionarBloqueio(data, motivo); setData(''); setMotivo(''); }}
@@ -202,7 +212,7 @@ const ProgramacaoTab = (p) => {
           desforcarCam={p.desforcarCam}
           simularForcar={p.simularForcar}
         />
-        <BloqueiosPanel bloqueios={p.bloqueios} adicionarBloqueio={p.adicionarBloqueio} removerBloqueio={p.removerBloqueio} />
+        <BloqueiosPanel bloqueios={p.bloqueios} adicionarBloqueio={p.adicionarBloqueio} removerBloqueio={p.removerBloqueio} diasDaSemana={p.diasDaSemana} />
       </div>
     </div>
 

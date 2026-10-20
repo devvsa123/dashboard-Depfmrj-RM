@@ -47,9 +47,10 @@ const ForcarCamPanel = ({ fila, porCam, capacidadeMedida, semanaRef, forcados, f
       <div className="p-6 border-b border-slate-100 flex items-center gap-2">
         <Zap className="text-fuchsia-500" size={20} />
         <h3 className="text-lg font-black text-slate-800">Forçar um CAM</h3>
+        <span className="text-[10px] font-bold text-slate-400 ml-auto">nesta semana</span>
         <InfoButton
           title="Quando usar"
-          description="Para demanda emergencial que sai da lógica normal de fornecimento. O CAM forçado passa na frente de tudo, inclusive das mensagens com prazo. Antes de confirmar, o painel mostra quantas RMs entram, quantas saem da grade e o que acontece com o material depois de pronto — inclusive se a janela do CDAM já fechou e ele vai esperar no pátio."
+          description="Para demanda emergencial que sai da lógica normal de fornecimento. Vale só para a semana que está na tela: ao mudar de semana, a lista volta a ser a daquela semana. O CAM forçado passa na frente de tudo, inclusive das mensagens com prazo. Antes de confirmar, o painel mostra quantas RMs entram, quantas saem da grade e o que acontece com o material depois de pronto — inclusive se a janela do CDAM já fechou e ele vai esperar no pátio."
         />
       </div>
 
@@ -115,7 +116,7 @@ const ForcarCamPanel = ({ fila, porCam, capacidadeMedida, semanaRef, forcados, f
       </div>
 
       <div className="divide-y divide-slate-50">
-        {forcados.length === 0 && <p className="px-6 py-6 text-center text-sm text-slate-400 italic">Nenhum CAM forçado. A semana segue a ordem normal.</p>}
+        {forcados.length === 0 && <p className="px-6 py-6 text-center text-sm text-slate-400 italic">Nenhum CAM forçado nesta semana. Ela segue a ordem normal.</p>}
         {forcados.map(c => (
           <div key={c} className="px-6 py-3 flex items-center justify-between gap-3">
             <span className="text-sm min-w-0">
