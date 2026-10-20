@@ -108,6 +108,9 @@ const ProgramacaoDocument = forwardRef(({ snapshot, diff, semanaRef, programador
           {resumo.porRota ? `, ${resumo.porRota} foram alocadas para pegar a rota do próprio CAM dentro da semana` : ''} e
           {' '}{resumo.porAntiguidade} saem da fila por antiguidade. A fila de separação soma {resumo.filaTotal} RMs — pedidos
           que ainda dependem de trabalho do depósito, sem contar os já conferidos e entregues à Expedição.
+          {resumo.reemitidasNaFila
+            ? ` Dessas, ${resumo.reemitidasNaFila} são RMs que já tinham sido canceladas e voltaram: elas contam pela data de entrada do ciclo novo, não pela do antigo.`
+            : ''}
         </p>
     </Secao>);
 

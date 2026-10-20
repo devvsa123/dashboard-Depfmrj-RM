@@ -307,6 +307,7 @@ export const programarSemana = ({
       camsSemGrade: gradesConsideradas.filter(g => g.dentro === null).length,
       camsAtendidos: porCam.size,
       filaTotal: fila.length,
+      reemitidasNaFila: fila.filter(f => f.reemitida).length,
       diasBloqueados: grade.filter(g => g.bloqueio).length,
       folgaAteOPrazo: comPrazo.length && hoje
         ? Math.min(...comPrazo.map(d => diffDias(hoje, limiteDeSeparacao(d.prazo, d.diasExpedicao) || d.prazo)))

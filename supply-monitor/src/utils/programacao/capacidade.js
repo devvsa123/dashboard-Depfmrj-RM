@@ -87,40 +87,86 @@ export const estaNaFila = (situacao) => !STATUS_FORA_DA_FILA.has(String(situacao
 
 // Índice rápido RM -> situação atual no WMS, usado para conferir as RMs
 // coladas e para montar a fila de atendimento.
+//
+// Uma RM aparece mais de uma vez no WMS por dois motivos diferentes, e
+// eles pedem leituras opostas:
+//
+//   liberação parcial — as linhas são do MESMO atendimento e trazem a
+//     mesma data de entrada. A RM continua em fila se QUALQUER uma
+//     delas ainda depender do depósito.
+//   reemissão — a RM foi cancelada e voltou depois, com NOVA data de
+//     entrada. Aí vale só o ciclo mais recente: o anterior morreu.
+//     Ler os dois juntos faria uma RM cancelada e reaberta ontem
+//     parecer de meses atrás e furar a fila de quem espera de verdade;
+//     e, no sentido contrário, manteria em fila uma RM cujo ciclo novo
+//     já foi expedido.
+//
+// Por isso as linhas são agrupadas primeiro por data de entrada, e só o
+// ciclo mais novo é lido.
+
+// Qual dos dois ciclos é o mais recente. A data de entrada manda; quando
+// falta (linha sem DATA_ENTRADA), o último movimento serve de desempate,
+// e um ciclo datado sempre vence um sem data — não dá para afirmar que o
+// sem data é mais novo.
+const cicloMaisRecente = (a, b) => {
+  if (a.entrada && b.entrada) return a.entrada >= b.entrada ? a : b;
+  if (a.entrada) return a;
+  if (b.entrada) return b;
+  if (a.movimento && b.movimento) return a.movimento >= b.movimento ? a : b;
+  return a.movimento ? a : b;
+};
+
 export const indexarWms = (data) => {
-  const indice = new Map();
+  const porRm = new Map();
+
   (data || []).forEach(item => {
     const rm = String(item.PEDIDO || '').trim();
     if (!rm) return;
-    const situacao = String(item.STATUS || '').toUpperCase().trim();
     const entrada = safeGetISODate(item.DATA_ENTRADA);
-    const atual = indice.get(rm);
-    // Uma RM pode ter mais de uma linha (liberações parciais). Para efeito
-    // de programação ela é uma só: fica em fila se QUALQUER linha estiver
-    // em fila, e vale a entrada mais antiga.
-    if (!atual) {
-      indice.set(rm, {
-        rm,
-        situacao,
-        cam: String(item.CAM || '').trim(),
-        documento: String(item.STC || '').trim(),
-        tipoRm: String(item.TIPO_RM || '').trim(),
+    const chaveCiclo = entrada || '';
+    if (!porRm.has(rm)) porRm.set(rm, new Map());
+    const ciclos = porRm.get(rm);
+    if (!ciclos.has(chaveCiclo)) {
+      ciclos.set(chaveCiclo, {
         entrada,
+        situacao: null,
+        cam: '',
+        documento: '',
+        tipoRm: '',
         // Em linha CONFERIDA esta data é a da própria conferência; em
         // linha EXPEDIDA, a da expedição. O acompanhamento usa isso para
         // saber em que semana o trabalho aconteceu.
-        movimento: safeGetISODate(item.DATA_SEPARACAO),
-        linhas: 1
+        movimento: null,
+        linhas: 0
       });
-      return;
     }
-    atual.linhas++;
-    if (entrada && (!atual.entrada || entrada < atual.entrada)) atual.entrada = entrada;
-    if (estaNaFila(situacao) && !estaNaFila(atual.situacao)) atual.situacao = situacao;
-    if (!atual.documento && item.STC) atual.documento = String(item.STC).trim();
+    const c = ciclos.get(chaveCiclo);
+    c.linhas++;
+    const situacao = String(item.STATUS || '').toUpperCase().trim();
+    if (c.situacao === null || (estaNaFila(situacao) && !estaNaFila(c.situacao))) c.situacao = situacao;
+    if (!c.cam && item.CAM) c.cam = String(item.CAM).trim();
+    if (!c.documento && item.STC) c.documento = String(item.STC).trim();
+    if (!c.tipoRm && item.TIPO_RM) c.tipoRm = String(item.TIPO_RM).trim();
     const mov = safeGetISODate(item.DATA_SEPARACAO);
-    if (mov && (!atual.movimento || mov > atual.movimento)) atual.movimento = mov;
+    if (mov && (!c.movimento || mov > c.movimento)) c.movimento = mov;
   });
+
+  const indice = new Map();
+  porRm.forEach((ciclos, rm) => {
+    const lista = Array.from(ciclos.values());
+    const atual = lista.reduce(cicloMaisRecente);
+    indice.set(rm, {
+      rm,
+      ...atual,
+      situacao: atual.situacao || '',
+      ciclos: lista.length,
+      // Houve ciclo anterior: a RM já foi aberta, morreu e voltou. Fica
+      // registrado para a tela poder dizer por que uma RM velha de
+      // documento aparece como nova na fila.
+      reemitida: lista.length > 1
+    });
+  });
+
   return indice;
 };
 

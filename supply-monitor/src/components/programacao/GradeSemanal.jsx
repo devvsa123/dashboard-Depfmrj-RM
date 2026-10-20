@@ -88,11 +88,19 @@ const GradeSemanal = ({ resultado }) => {
           { t: 'Ocupação', v: `${resumo.ocupacao}%` },
           { t: 'Com Prazo', v: resumo.comPrazo },
           { t: 'CAMs Atendidos', v: resumo.camsAtendidos },
-          { t: 'Fila de Separação', v: resumo.filaTotal }
+          {
+            t: 'Fila de Separação',
+            v: resumo.filaTotal,
+            // RM cancelada que voltou conta pela data de entrada nova.
+            // Sem essa nota, quem conhece a base estranha a fila mudar
+            // de tamanho sem RM nova aparecer.
+            nota: resumo.reemitidasNaFila ? `${resumo.reemitidasNaFila} reemitida(s)` : null
+          }
         ].map(c => (
           <div key={c.t} className="bg-white p-4 rounded-2xl border border-slate-200">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{c.t}</p>
             <p className="text-2xl font-black text-slate-900 leading-none mt-1.5">{c.v}</p>
+            {c.nota && <p className="text-[10px] font-bold text-slate-400 mt-1">{c.nota}</p>}
           </div>
         ))}
       </div>
