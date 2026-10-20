@@ -1,31 +1,38 @@
-import { criarDocumento, AZUL, TINTA, SUAVE, VERMELHO, AMBAR } from './pdfTexto';
-import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana, diasUteisDaSemana } from './semana';
-import { janelasDaSemana } from './expedicao';
-import { rotaDescrita } from './rotas';
+import { criarDocumento, TINTA, SUAVE, AZUL, VERMELHO, AMBAR } from './pdfTexto';
+import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana, diasUteisDaSemana, somaDiasUteis } from './semana';
+import { janelasDaSemana, DIAS_EXPEDICAO } from './expedicao';
+import { rotaDescrita, TRATAMENTOS } from './rotas';
 
 // -----------------------------------------------------------------------
-// Documento da Expedição. A programação diz o que o depósito vai SEPARAR;
-// este diz o que a Expedição vai PRONTIFICAR e ENTREGAR, respeitando as
-// rotas de cada CAM e as janelas de inserção de STC do CDAM.
+// Documento da Expedição — a ordem de serviço da semana.
 //
-// Escrito como texto, não como imagem da página: com os números reais da
-// operação o documento passa de cinquenta páginas, e nenhum canvas de
-// navegador aguenta isso (ver pdfTexto.js).
+// Não é um retrato do que está parado: é a lista do que precisa ser
+// feito, dia a dia, nas três etapas da linha de produção.
+//
+//   recebido  — o que a estocagem concluiu no dia útil anterior e chegou
+//               hoje na Expedição, para montar mapa e lançar documento
+//   entregar  — as GTC que saem hoje, pela rota do cliente
+//   atender   — as STC cujo prazo vence hoje
+//
+// O prazo de cada bloco é o menor entre o prazo próprio da Expedição
+// (3 dias úteis da chegada), o prazo da mensagem que originou a RM e a
+// saída do CAM. O documento imprime qual deles mandou, porque é esse
+// dia que vai ser cobrado.
+//
+// Aqui só aparecem CAM e quantidade. A relação das RMs fica nos anexos:
+// o A para o que ainda não tem documento, o B por GTC ou STC.
 // -----------------------------------------------------------------------
-
-const rotuloDoDia = (bloco) => (bloco.proximaSemana
-  ? `Segunda seguinte — ${bloco.total} RM(s)`
-  : `${DIAS_SEMANA[new Date(bloco.dia + 'T00:00:00Z').getUTCDay()]}, ${formatarBr(bloco.dia)} — ${bloco.total} RM(s)`);
 
 const nomeDoCam = (g) => (g.sigla && g.sigla !== g.cam ? `${g.sigla} — ${g.cam}` : g.cam);
+const diaPorExtenso = (iso) => `${DIAS_SEMANA[new Date(iso + 'T00:00:00Z').getUTCDay()]}, ${formatarBr(iso)}`;
 
 export const gerarPdfExpedicao = ({ filas, projecao, semanaRef, programador, encarregado, versao, emitidoEm }) => {
   if (!filas) throw new Error('Sem dados da Expedição para gerar o documento.');
 
   const dias = diasUteisDaSemana(semanaRef);
   const janelas = janelasDaSemana(filas, dias[0], dias[dias.length - 1]);
-  const blocos = [...(projecao?.agenda || []), ...(projecao?.sobra ? [projecao.sobra] : [])];
   const { resumo } = filas;
+  const blocos = projecao?.blocos || [];
 
   // Só o que já passou do verde entra na cobrança: listar o que está no
   // prazo encheria páginas de linha sem ação.
@@ -56,107 +63,172 @@ export const gerarPdfExpedicao = ({ filas, projecao, semanaRef, programador, enc
     { rotulo: 'CAMs a fechar', valor: resumo.camsAFechar }
   ]);
   p.paragrafo(
-    `São ${resumo.aProntificar} RM(s) conferidas esperando mapa de carregamento e documento. Dessas, as de entrega nossa `
-    + 'saem pelas rotas da seção 3; as de retirada por terceiro precisam ter a STC lançada dentro da janela do CDAM, na '
-    + `seção 4. Outras ${resumo.stcACobrar} RM(s) já estão com documento lançado e dependem apenas da retirada`
-    + (resumo.vermelhos > 0 ? `, sendo ${resumo.vermelhos} paradas há mais de 15 dias` : '') + '.'
+    `O material concluído pela estocagem num dia chega à Expedição no dia útil seguinte. A partir daí o prazo para `
+    + `montar o mapa e lançar o documento é de ${DIAS_EXPEDICAO} dias úteis para RM comum, ou o prazo da mensagem `
+    + 'quando houver — e, nos dois casos, nunca depois da saída do CAM. A seção 3 traz, dia a dia, o que entra, o que '
+    + `sai e o que vence. Há ainda ${resumo.stcACobrar} RM(s) com documento já lançado, que dependem apenas da `
+    + `retirada${resumo.vermelhos > 0 ? `, sendo ${resumo.vermelhos} paradas há mais de 15 dias` : ''}.`
   );
 
-  // ── 2. A grade ────────────────────────────────────────────────────
-  const montaGrade = (pegar) => {
-    const linhas = new Map();
-    blocos.forEach(bloco => pegar(bloco).forEach(g => {
-      if (!linhas.has(g.cam)) linhas.set(g.cam, { cam: g.cam, sigla: g.sigla, porDia: {}, total: 0 });
-      const l = linhas.get(g.cam);
-      const chave = bloco.dia || 'proxima';
-      l.porDia[chave] = (l.porDia[chave] || 0) + g.rms.length;
-      l.total += g.rms.length;
-    }));
-    return Array.from(linhas.values()).sort((a, b) => b.total - a.total);
-  };
-  const temProxima = blocos.some(b => b.proximaSemana);
-  const colunasGrade = [
-    { key: 'cam', label: 'CAM', largura: temProxima ? 0.34 : 0.40, forte: true },
-    ...dias.map(d => ({ key: d, label: formatarCurto(d), largura: temProxima ? 0.10 : 0.11, align: 'center' })),
-    ...(temProxima ? [{ key: 'proxima', label: 'Seg seg.', largura: 0.10, align: 'center' }] : []),
-    { key: 'total', label: 'Total', largura: temProxima ? 0.06 : 0.05, align: 'right', forte: true }
-  ];
-  const linhasGrade = (linhas) => linhas.map(l => ({
-    cam: nomeDoCam(l),
-    ...Object.fromEntries(dias.map(d => [d, l.porDia[d] || '—'])),
-    ...(temProxima ? { proxima: l.porDia.proxima || '—' } : {}),
-    total: l.total
-  }));
-  const rodapeGrade = (linhas) => ({
-    cam: 'TOTAL',
-    ...Object.fromEntries(dias.map(d => [d, linhas.reduce((t, l) => t + (l.porDia[d] || 0), 0) || '—'])),
-    ...(temProxima ? { proxima: linhas.reduce((t, l) => t + (l.porDia.proxima || 0), 0) || '—' } : {}),
-    total: linhas.reduce((t, l) => t + l.total, 0)
-  });
-
-  const gradesPorTipo = [
-    { titulo: 'GTC — entrega nossa', linhas: montaGrade(b => b.gtc) },
-    { titulo: 'STC — lançar e aguardar o CDAM', linhas: montaGrade(b => b.stc) },
-    { titulo: 'Sem rota cadastrada', linhas: montaGrade(b => b.semRota) }
-  ].filter(b => b.linhas.length > 0);
-
+  // ── 2. A grade da semana ──────────────────────────────────────────
   if (blocos.length > 0) {
-    p.secao(num(), 'Grade de Prontificação da Semana');
-    p.paragrafo('Quantas RMs de cada CAM a Expedição recebe em cada dia. GTC e STC vêm em blocos separados porque o '
-      + 'trabalho é diferente: a GTC termina no caminhão, a STC termina no lançamento do documento.');
-    gradesPorTipo.forEach(b => p.tabela({
-      titulo: b.titulo, colunas: colunasGrade, linhas: linhasGrade(b.linhas), rodape: rodapeGrade(b.linhas)
+    const porCamGrade = new Map();
+    blocos.forEach(b => {
+      if (!porCamGrade.has(b.cam)) {
+        porCamGrade.set(b.cam, { cam: b.cam, sigla: b.sigla, tratamento: b.tratamento, porDia: {}, total: 0, prazo: null, saiEm: null });
+      }
+      const l = porCamGrade.get(b.cam);
+      l.porDia[b.chegouEm] = (l.porDia[b.chegouEm] || 0) + b.qtd;
+      l.total += b.qtd;
+      if (!l.prazo || b.prazo < l.prazo) l.prazo = b.prazo;
+      if (b.saiEm && (!l.saiEm || b.saiEm < l.saiEm)) l.saiEm = b.saiEm;
+    });
+
+    const montaLinhas = (tratamento) => Array.from(porCamGrade.values())
+      .filter(l => (tratamento === 'OUTROS'
+        ? l.tratamento !== TRATAMENTOS.GTC && l.tratamento !== TRATAMENTOS.STC
+        : l.tratamento === tratamento))
+      .sort((a, b) => b.total - a.total);
+
+    const colunas = [
+      { key: 'cam', label: 'CAM', largura: 0.28, forte: true },
+      ...dias.map(d => ({ key: d, label: formatarCurto(d), largura: 0.077, align: 'center' })),
+      { key: 'total', label: 'Total', largura: 0.07, align: 'center', forte: true },
+      { key: 'prazo', label: 'Prontificar até', largura: 0.145, align: 'center' },
+      { key: 'saida', label: 'Sai em', largura: 0.12, align: 'right' }
+    ];
+    const linhasDe = (lista) => lista.map(l => ({
+      cam: l.sigla && l.sigla !== l.cam ? `${l.sigla} — ${l.cam}` : l.cam,
+      ...Object.fromEntries(dias.map(d => [d, l.porDia[d] || '—'])),
+      total: l.total,
+      prazo: l.prazo ? formatarBr(l.prazo) : '—',
+      saida: l.saiEm ? formatarBr(l.saiEm) : '—'
+    }));
+
+    p.secao(num(), 'Grade da Semana por CAM');
+    p.paragrafo('Quanto material de cada cliente chega à Expedição em cada dia, até quando precisa estar prontificado e '
+      + 'quando sai. As colunas de dia são a CHEGADA na Expedição — um dia útil depois de a estocagem concluir.');
+    [
+      { titulo: 'GTC — entrega nossa', linhas: montaLinhas(TRATAMENTOS.GTC) },
+      { titulo: 'STC — lançar e aguardar o CDAM', linhas: montaLinhas(TRATAMENTOS.STC) },
+      { titulo: 'Sem rota cadastrada', linhas: montaLinhas('OUTROS') }
+    ].filter(b => b.linhas.length > 0).forEach(b => p.tabela({
+      titulo: b.titulo,
+      colunas,
+      linhas: linhasDe(b.linhas),
+      rodape: {
+        cam: 'TOTAL',
+        ...Object.fromEntries(dias.map(d => [d, b.linhas.reduce((t, l) => t + (l.porDia[d] || 0), 0) || '—'])),
+        total: b.linhas.reduce((t, l) => t + l.total, 0),
+        prazo: '', saida: ''
+      }
     }));
   }
 
-  // ── 3. Dia a dia ──────────────────────────────────────────────────
-  const colunasDaOrdem = [
-    { key: 'ordem', label: '#', largura: 0.06, align: 'center' },
-    { key: 'cam', label: 'CAM', largura: 0.34, forte: true },
-    { key: 'porque', label: 'Por que nesta ordem', largura: 0.42 },
+  // ── 3. A ordem de serviço, dia a dia ──────────────────────────────
+  p.secao(num(), 'O Que Fazer em Cada Dia');
+  p.paragrafo('Três etapas em cada dia. RECEBIDO é o que a estocagem concluiu no dia útil anterior e chegou agora: '
+    + 'montar o mapa de carregamento e lançar o documento até o prazo indicado. ENTREGAR são as GTC que saem hoje pela '
+    + 'rota do cliente. ATENDER são as STC cujo prazo vence hoje — é este dia que será cobrado da Expedição.');
+
+  const colunasRecebido = [
+    { key: 'cam', label: 'CAM', largura: 0.38, forte: true },
     { key: 'rms', label: 'RMs', largura: 0.09, align: 'center' },
-    { key: 'atraso', label: 'Atrasadas', largura: 0.09, align: 'right' }
+    { key: 'atraso', label: 'Atrasadas', largura: 0.11, align: 'center' },
+    { key: 'prazo', label: 'Prontificar até', largura: 0.17, align: 'center' },
+    { key: 'porque', label: 'Prazo que manda', largura: 0.25 }
+  ];
+  const colunasEntregar = [
+    { key: 'cam', label: 'CAM', largura: 0.32, forte: true },
+    { key: 'doc', label: 'Documento', largura: 0.40 },
+    { key: 'rms', label: 'RMs', largura: 0.12, align: 'center' },
+    { key: 'situacao', label: 'Situação', largura: 0.16, align: 'right' }
+  ];
+  const colunasAtender = [
+    { key: 'cam', label: 'CAM', largura: 0.32, forte: true },
+    { key: 'rms', label: 'RMs', largura: 0.10, align: 'center' },
+    { key: 'janela', label: 'Janela do CDAM', largura: 0.22, align: 'center' },
+    { key: 'porque', label: 'Prazo que manda', largura: 0.36 }
   ];
 
-  p.secao(num(), 'Prontificação Dia a Dia');
-  p.paragrafo('O que a Expedição recebe em cada dia e em que ordem atacar. O que a separação conclui num dia fica '
-    + 'disponível no dia útil seguinte — por isso o que for separado na sexta aparece na segunda. A ordem dentro do dia '
-    + 'é a mesma régua da separação: CAM forçado na frente, depois quem vence primeiro, antiguidade no fim.'
-    + (projecao?.temPlano ? '' : ' A programação da separação desta semana ainda não foi publicada, então abaixo consta '
-      + 'apenas o que já está conferido esperando documento.'));
+  const blocoDoDia = (d, rotulo, nota) => {
+    if (!d.temTrabalho) return;
+    p.reservar(30);
+    p.texto(rotulo, { tamanho: 9.5, estilo: 'bold', cor: TINTA, espacoDepois: 0.8 });
+    if (nota) p.texto(nota, { tamanho: 7.5, cor: SUAVE, espacoDepois: 1.5 });
+    p.regua([203, 213, 225], 0.2, 2);
 
-  if (blocos.length === 0) {
-    p.paragrafo('Nada a prontificar nesta semana.', { estilo: 'italic' });
-  } else {
-    blocos.forEach(bloco => {
-      p.reservar(28);
-      p.texto(rotuloDoDia(bloco), { tamanho: 9, estilo: 'bold', cor: TINTA, espacoDepois: 1.5 });
-      [
-        { titulo: 'GTC — entrega nossa', grupos: bloco.gtc },
-        { titulo: 'STC — lançar e aguardar o CDAM', grupos: bloco.stc },
-        { titulo: 'Sem rota cadastrada', grupos: bloco.semRota }
-      ].filter(b => b.grupos.length > 0).forEach(b => p.tabela({
-        titulo: b.titulo,
-        colunas: colunasDaOrdem,
-        espacoDepois: 2.5,
-        linhas: b.grupos.map((g, i) => ({
-          ordem: `${i + 1}º`,
-          cam: nomeDoCam(g),
-          porque: g.urgencia.texto,
-          rms: g.rms.length,
-          atraso: g.atrasadas || '—'
+    if (d.chegar.length > 0) {
+      p.tabela({
+        titulo: `Recebido da estocagem — prontificar  (${d.chegar.reduce((t, b) => t + b.qtd, 0)} RM)`,
+        colunas: colunasRecebido, espacoDepois: 3,
+        linhas: d.chegar.map(b => ({
+          cam: nomeDoCam(b),
+          rms: b.qtd,
+          atraso: b.atrasadas || '—',
+          prazo: formatarBr(b.prazo),
+          porque: b.motivo
         }))
-      }));
-      p.y += 2;
-    });
+      });
+    }
+    if (d.entregar.length > 0) {
+      p.tabela({
+        titulo: `Entregar — GTC que saem  (${d.entregar.reduce((t, b) => t + b.qtd, 0)} RM)`,
+        colunas: colunasEntregar, espacoDepois: 3,
+        linhas: d.entregar.map(b => ({
+          cam: nomeDoCam(b),
+          // Vinte e cinco números de GTC numa célula não se lê: os
+          // primeiros dão o reconhecimento, o resto está no Anexo B.
+          doc: (() => {
+            const lancados = b.documentos?.length
+              ? (b.documentos.length <= 3
+                ? b.documentos.map(x => x.documento).join(', ')
+                : `${b.documentos.slice(0, 2).map(x => x.documento).join(', ')} e mais ${b.documentos.length - 2} — ver Anexo B`)
+              : '';
+            const falta = b.aLancar ? `${b.aLancar} RM a lançar antes da saída` : '';
+            return [lancados, falta].filter(Boolean).join(' · ') || 'a lançar antes da saída';
+          })(),
+          rms: b.qtd,
+          situacao: b.aLancar && b.documentos?.length ? 'parcial'
+            : b.documentos?.length ? 'lançada' : 'a prontificar'
+        }))
+      });
+    }
+    if (d.atender.length > 0) {
+      p.tabela({
+        titulo: `Atender — STC que vencem hoje  (${d.atender.reduce((t, b) => t + b.qtd, 0)} RM)`,
+        colunas: colunasAtender, espacoDepois: 3,
+        linhas: d.atender.map(b => ({
+          cam: nomeDoCam(b),
+          rms: b.qtd,
+          janela: b.janela ? `${formatarCurto(b.janela.inicio)} a ${formatarCurto(b.janela.fim)}` : rotaDescrita(b.config),
+          porque: b.motivo
+        }))
+      });
+    }
+    p.y += 1.5;
+  };
+
+  const temAlgo = (projecao?.agenda || []).some(d => d.temTrabalho);
+  if (!temAlgo && !projecao?.depois?.temTrabalho) {
+    p.paragrafo('Nada a fazer nesta semana.', { estilo: 'italic' });
+  } else {
+    (projecao?.agenda || []).forEach(d => blocoDoDia(
+      d,
+      diaPorExtenso(d.dia),
+      `Recebe o que a estocagem concluiu em ${formatarBr(somaDiasUteis(d.dia, -1))}.`
+    ));
+    if (projecao?.depois?.temTrabalho) {
+      blocoDoDia({ ...projecao.depois, temTrabalho: true }, 'Depois desta semana',
+        'Já encomendado pela programação, com as datas reais de chegada e de saída.');
+    }
   }
 
   // ── 4. Janelas ────────────────────────────────────────────────────
   p.secao(num(), 'Fechamento das STC por Janela do CDAM');
   p.paragrafo('Para cada CAM, o processo só fecha quando a STC está lançada em todas as RM não canceladas. "Faltam" é o '
     + 'que ainda está conferido sem documento; a coluna seguinte mostra o que ainda depende da separação e entrará '
-    + 'depois. A ordem é a do fechamento da janela: quem fecha antes vem antes, mesmo que a janela termine antes desta '
-    + 'semana começar — aí o prazo já está correndo e perdê-lo significa esperar o mês seguinte.');
+    + 'depois. A ordem é a do fechamento da janela.');
   if (janelas.length === 0) {
     p.paragrafo('Nenhum CAM de STC com pendência.', { estilo: 'italic' });
   } else {
@@ -187,8 +259,8 @@ export const gerarPdfExpedicao = ({ filas, projecao, semanaRef, programador, enc
   // ── 5. Cobrança ───────────────────────────────────────────────────
   if (cobrar.length > 0) {
     p.secao(num(), 'Pendências de Retirada — Cobrar o CDAM');
-    p.paragrafo('Documentos já lançados, com o material pronto e sem retirada. O prazo é contado da conferência. Até 7 '
-      + 'dias a situação é normal; de 8 a 15 dias cabe aviso; acima de 15 dias cabe cobrança formal.');
+    p.paragrafo('Documentos já lançados, com o material pronto e sem retirada. Não dependem da Expedição: o que cabe '
+      + 'aqui é cobrar. Até 7 dias a situação é normal; de 8 a 15 dias cabe aviso; acima de 15 dias cabe cobrança formal.');
     p.tabela({
       colunas: [
         { key: 'doc', label: 'Documento', largura: 0.20, forte: true },
@@ -213,8 +285,8 @@ export const gerarPdfExpedicao = ({ filas, projecao, semanaRef, programador, enc
   // ── 6. Sem rota ───────────────────────────────────────────────────
   if (filas.semCadastro.length > 0) {
     p.secao(num(), 'CAMs sem Rota Cadastrada');
-    p.paragrafo('Têm material parado na Expedição mas ainda não foram classificados como entrega nossa ou retirada por '
-      + 'terceiro. Enquanto isso não for definido, não entram no roteiro acima.');
+    p.paragrafo('Têm material na Expedição mas ainda não foram classificados como entrega nossa ou retirada por '
+      + 'terceiro. Sem isso não há saída nem prazo de rota: valem só os dias de prazo da Expedição.');
     p.tabela({
       colunas: [
         { key: 'cam', label: 'CAM', largura: 0.62, forte: true },
@@ -234,72 +306,72 @@ export const gerarPdfExpedicao = ({ filas, projecao, semanaRef, programador, enc
     { nome: encarregado, papel: 'Encarregado do Abastecimento' }
   ]);
 
-  // ── Anexo A: o trabalho da Expedição ──────────────────────────────
-  const anexo = [...filas.gtc, ...filas.stc, ...filas.semCadastro]
-    .filter(g => g.aProntificar.length + g.aEntregar.length > 0);
+  // ── Anexo A: o que ainda não tem documento ────────────────────────
+  const porCamAnexo = new Map();
+  blocos.forEach(b => {
+    if (!porCamAnexo.has(b.cam)) porCamAnexo.set(b.cam, { cam: b.cam, sigla: b.sigla, config: b.config, tratamento: b.tratamento, entradas: [], total: 0 });
+    const l = porCamAnexo.get(b.cam);
+    l.entradas.push(b);
+    l.total += b.qtd;
+  });
+  const anexoA = Array.from(porCamAnexo.values()).sort((a, b) => b.total - a.total);
 
-  if (anexo.length > 0) {
+  if (anexoA.length > 0) {
     p.tituloDeAnexo({
-      titulo: 'ANEXO A — RELAÇÃO DAS RMS POR CAM',
+      titulo: 'ANEXO A — A PRONTIFICAR, POR CAM',
       subtitulo: `Semana de ${rotuloSemana(semanaRef)}${versao ? ` · ${versao}` : ''} · emitido em ${emitidoEm}`
     });
-    p.paragrafo('Por CAM: primeiro o que ainda não tem documento, com os dias de espera de cada RM; depois cada GTC já '
-      + 'lançada e ainda não expedida, com as RMs que ela carrega. Serve para conferir o que está fisicamente na '
-      + 'Expedição contra o que este documento manda prontificar e entregar. Os documentos que só dependem da retirada '
-      + 'estão no Anexo B.');
-
-    anexo.forEach(g => {
-      // Agrupa por DOCUMENTO em vez de repetir o número da GTC ao lado de
-      // cada RM: numa GTC com 113 RMs o número aparecia 113 vezes.
-      const docs = new Map();
-      g.aEntregar.forEach(l => {
-        const chave = String(l.documento || '').trim() || '(sem número)';
-        if (!docs.has(chave)) docs.set(chave, { documento: chave, tipo: l.tipoDoc, rms: [], dias: 0 });
-        const d = docs.get(chave);
-        d.rms.push(l);
-        if ((l.dias ?? 0) > d.dias) d.dias = l.dias ?? 0;
-      });
-      const documentos = Array.from(docs.values()).sort((a, b) => b.rms.length - a.rms.length);
-
-      p.reservar(24);
-      p.texto(`${nomeDoCam(g)}  ·  ${g.tratamento === 'GTC' ? `entrega nossa, ${rotaDescrita(g.config)}` : `retirada por terceiro, ${rotaDescrita(g.config)}`}`,
+    p.paragrafo('O material que ainda não tem GTC nem STC, detalhado por cliente e por dia de chegada à Expedição. '
+      + 'É a relação que se confere fisicamente na doca contra o que a seção 3 manda prontificar.');
+    anexoA.forEach(c => {
+      p.reservar(22);
+      p.texto(`${c.sigla && c.sigla !== c.cam ? `${c.sigla} — ${c.cam}` : c.cam}  ·  ${c.total} RM(s)  ·  ${c.tratamento === TRATAMENTOS.GTC ? `entrega nossa, ${rotaDescrita(c.config)}` : c.tratamento === TRATAMENTOS.STC ? `retirada por terceiro, ${rotaDescrita(c.config)}` : 'sem rota cadastrada'}`,
         { tamanho: 9, estilo: 'bold', cor: TINTA, espacoDepois: 1 });
       p.regua([203, 213, 225], 0.2, 1.5);
-
-      if (g.aProntificar.length > 0) {
-        p.texto(`Sem documento — ${g.aProntificar.length} RM(s)`, { tamanho: 7.5, estilo: 'bold', cor: SUAVE, espacoDepois: 0.5 });
-        p.gradeDeRms(g.aProntificar.map(l => ({ rm: l.rm, nota: l.dias != null ? `${l.dias}d` : '' })));
-      }
-      documentos.forEach(d => {
+      c.entradas.forEach(b => {
         p.reservar(14);
-        p.texto(`${d.documento}   ${d.tipo || ''}   ${d.rms.length} RM(s)${d.dias > 0 ? `   parado há ${d.dias} dias` : ''}`,
-          { tamanho: 8.5, estilo: 'bold', cor: AZUL, espacoDepois: 0.5 });
-        p.gradeDeRms(d.rms.map(l => ({ rm: l.rm })));
+        p.texto(`Chegou em ${formatarBr(b.chegouEm)} · prontificar até ${formatarBr(b.prazo)} · ${b.qtd} RM(s)`,
+          { tamanho: 8, estilo: 'bold', cor: AZUL, espacoDepois: 0.5 });
+        p.gradeDeRms(b.rms.map(l => ({ rm: l.rm, nota: l.atrasada ? 'atr.' : '' })));
       });
       p.y += 2;
     });
   }
 
-  // ── Anexo B: a cobrança ───────────────────────────────────────────
-  const anexoCobranca = cobrar.map(d => {
-    const grupo = filas.grupos.find(g => g.cam === d.cam);
-    const rms = (grupo?.inseridas || []).filter(l =>
-      String(l.documento || '').trim().toUpperCase() === String(d.documento || '').trim().toUpperCase());
-    return { ...d, listaRms: rms };
-  }).filter(d => d.listaRms.length > 0);
+  // ── Anexo B: o que já tem documento ───────────────────────────────
+  const documentos = [];
+  (filas.grupos || []).forEach(g => {
+    const porDoc = new Map();
+    [...g.aEntregar.map(l => ({ ...l, estado: 'a entregar' })),
+     ...g.inseridas.map(l => ({ ...l, estado: 'aguardando retirada' }))].forEach(l => {
+      const chave = String(l.documento || '').trim() || '(sem número)';
+      if (!porDoc.has(chave)) porDoc.set(chave, { documento: chave, tipo: l.tipoDoc, cam: g.cam, sigla: g.config.sigla || g.cam, estado: l.estado, rms: [], dias: 0 });
+      const d = porDoc.get(chave);
+      d.rms.push(l);
+      if ((l.dias ?? 0) > d.dias) d.dias = l.dias ?? 0;
+    });
+    porDoc.forEach(d => documentos.push(d));
+  });
+  // Primeiro o que depende de nós, depois o que depende do CDAM; dentro
+  // de cada grupo, o que está parado há mais tempo.
+  documentos.sort((a, b) => {
+    if (a.estado !== b.estado) return a.estado === 'a entregar' ? -1 : 1;
+    return b.dias - a.dias;
+  });
 
-  if (anexoCobranca.length > 0) {
+  if (documentos.length > 0) {
     p.tituloDeAnexo({
-      titulo: 'ANEXO B — DOCUMENTOS AGUARDANDO RETIRADA',
+      titulo: 'ANEXO B — POR GTC E STC JÁ LANÇADAS',
       subtitulo: `Semana de ${rotuloSemana(semanaRef)}${versao ? ` · ${versao}` : ''} · emitido em ${emitidoEm}`
     });
-    p.paragrafo('Cada documento já lançado e parado há mais de 7 dias, com as RMs que ele carrega. É a lista de '
-      + 'cobrança: o material está pronto e o que falta não depende do depósito. Os documentos no prazo não entram aqui.');
-    anexoCobranca.forEach(d => {
+    p.paragrafo('Cada documento já lançado, com o cliente e as RMs que ele carrega. As de "a entregar" são entrega '
+      + 'nossa e dependem da rota; as de "aguardando retirada" estão prontas e dependem do CDAM.');
+    documentos.forEach(d => {
       p.reservar(14);
-      p.texto(`${d.documento}   ${d.sigla}   ${d.listaRms.length} RM(s)   parado há ${d.dias} dias`,
-        { tamanho: 8.5, estilo: 'bold', cor: d.nivel.key === 'vermelho' ? VERMELHO : AMBAR, espacoDepois: 0.5 });
-      p.gradeDeRms(d.listaRms.map(l => ({ rm: l.rm })));
+      const cor = d.estado === 'a entregar' ? AZUL : (d.dias > 15 ? VERMELHO : AMBAR);
+      p.texto(`${d.documento}   ${d.tipo || ''}   ${d.sigla}   ${d.rms.length} RM(s)   ${d.estado}${d.dias > 0 ? ` · pronta há ${d.dias} dias` : ''}`,
+        { tamanho: 8.5, estilo: 'bold', cor, espacoDepois: 0.5 });
+      p.gradeDeRms(d.rms.map(l => ({ rm: l.rm })));
     });
   }
 

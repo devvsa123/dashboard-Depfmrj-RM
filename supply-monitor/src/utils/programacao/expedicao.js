@@ -1,7 +1,6 @@
 import { classifyStc } from '../../hooks/useStcGtcAnalysis';
-import { diffDias, hojeIso } from './semana';
-import { TRATAMENTOS, proximaRota, proximaJanela, prazoDaRota, nivelCobranca, configVazia } from './rotas';
-import { urgenciaDe, porUrgencia } from './prioridade';
+import { diffDias, hojeIso, somaDiasUteis, formatarBr } from './semana';
+import { TRATAMENTOS, proximaRota, proximaJanela, nivelCobranca, configVazia } from './rotas';
 
 // A fila da Expedição — o trecho do processo que começa onde a
 // programação da separação termina.
@@ -193,124 +192,198 @@ export const janelasDaSemana = (filas, inicioSemana, fimSemana) =>
       return b.faltamFechar - a.faltamFechar;
     });
 
-// ── A ponte entre a separação e a Expedição ─────────────────────────
-//
-// Até aqui a fila da Expedição era uma fotografia do que já está parado.
-// Falta a outra metade: o que a separação vai entregar durante a semana.
-// Sem isso a Expedição descobre o trabalho quando ele aparece na doca.
-//
-// O encadeamento é este:
-//
-//   dia D  — a separação conclui a RM (status CONFERIDO)
-//   dia D+1 — a Expedição monta o mapa e lança o documento
-//   depois  — GTC sai na rota do CAM; STC espera o CDAM retirar
-//
-// A RM conferida na sexta só é prontificada na segunda seguinte, e o
-// documento diz isso em vez de fingir que coube na semana.
-//
-// A ordem dentro de cada dia é a mesma régua da separação: CAM forçado
-// na frente, depois quem vence primeiro, antiguidade no fim. É o que
-// responde "separei 17 CAMs, qual ataco primeiro?" sem depender de quem
-// está de serviço.
 
-const proximoDiaUtilDentro = (dia, dias) => dias.find(d => d > dia) || null;
+// ── A linha de produção da Expedição ────────────────────────────────
+//
+// A separação diz o que o depósito conclui em cada dia. A Expedição tem
+// o seu próprio relógio a partir daí, e é ele que esta projeção monta:
+//
+//   dia D    — a estocagem conclui a RM (status CONFERIDO)
+//   dia D+1  — o material chega à Expedição e entra na fila dela
+//   até D+4  — prazo para tratar: montar o mapa e lançar o documento
+//              (3 dias úteis a contar da chegada, para RM comum)
+//   depois   — a GTC sai na rota do CAM; a STC fica lançada esperando
+//              o CDAM retirar
+//
+// O prazo de uma RM comum é o prazo de 3 dias. O de uma RM que veio de
+// mensagem é o prazo da própria mensagem. E nenhum dos dois vale se a
+// saída do CAM vier antes: de nada serve ter 3 dias se o caminhão
+// daquele cliente passa amanhã, ou se a janela do CDAM fecha depois de
+// amanhã. Por isso o prazo de cada bloco é o MENOR dos três, e o
+// documento imprime qual deles mandou — é esse dia que se cobra.
+
+export const DIAS_EXPEDICAO = 3;
+
+const menorData = (a, b) => (!a ? b : !b ? a : (a <= b ? a : b));
+
+// O prazo de um bloco e a razão dele, escolhendo entre o prazo próprio
+// da Expedição, o prazo da mensagem e a saída do CAM.
+const prazoDoBloco = ({ chegouEm, prazoDemanda, rota, janela, forcado }) => {
+  // O texto é curto de propósito: numa tabela de trinta linhas a regra
+  // inteira repetida em cada uma vira ruído. A regra está no texto da
+  // seção; aqui só precisa dizer QUAL dos prazos mandou.
+  const candidatos = [
+    { data: somaDiasUteis(chegouEm, DIAS_EXPEDICAO), motivo: `Prazo da Expedição (${DIAS_EXPEDICAO} d. úteis)` }
+  ];
+  if (prazoDemanda) candidatos.push({ data: prazoDemanda, motivo: `Prazo de mensagem (${formatarBr(prazoDemanda)})` });
+  if (rota) candidatos.push({ data: rota, motivo: `Rota do CAM (${formatarBr(rota)})` });
+  if (janela) candidatos.push({ data: janela.fim, motivo: `Janela do CDAM (até ${formatarBr(janela.fim)})` });
+
+  const vencedor = candidatos.reduce((a, b) => (a.data <= b.data ? a : b));
+
+  // A STC só pode ser lançada DENTRO da janela do CDAM. Sem isto, uma
+  // RM que chega muito antes da janela abrir ganhava prazo pelos 3 dias
+  // e o documento mandava lançar numa data em que o CDAM ainda não
+  // aceita — cobrança impossível de cumprir.
+  if (janela && vencedor.data < janela.inicio) {
+    return {
+      prazo: janela.inicio,
+      motivo: forcado ? 'Atendimento forçado pelo programador' : `Janela do CDAM (abre em ${formatarBr(janela.inicio)})`
+    };
+  }
+
+  return {
+    prazo: vencedor.data,
+    motivo: forcado ? 'Atendimento forçado pelo programador' : vencedor.motivo
+  };
+};
 
 export const projetarExpedicao = ({ filas, snapshot, dias, porCam, forcados = [], hoje = hojeIso() }) => {
   const forcadosSet = new Set(forcados || []);
+  const primeiroDia = dias[0];
+  const ultimoDia = dias[dias.length - 1];
   const itens = [];
 
-  // O que já está conferido e sem documento entra no primeiro dia: é
-  // trabalho atrasado, não trabalho da semana.
+  // O que já está conferido e sem documento chega no primeiro dia da
+  // semana: é trabalho atrasado, não trabalho desta semana.
   (filas?.grupos || []).forEach(g => g.aProntificar.forEach(l => itens.push({
-    rm: l.rm,
-    cam: g.cam,
-    disponivelEm: dias[0],
-    atrasada: true,
-    entrada: l.entrada,
-    diasEmFila: l.dias,
-    prazoLimite: null
+    rm: l.rm, cam: g.cam, chegouEm: primeiroDia, atrasada: true,
+    prazoDemanda: null, entrada: l.entrada, diasEmFila: l.dias
   })));
 
-  // O que a separação entrega, dia a dia, segundo a versão publicada.
+  // O que a separação entrega: chega no dia útil seguinte ao da
+  // conclusão, inclusive quando isso cai na semana seguinte.
   (snapshot?.grade || []).forEach(slot => slot.alocacoes.forEach(a => itens.push({
-    rm: a.rm,
-    cam: a.cam || '(sem CAM)',
-    disponivelEm: proximoDiaUtilDentro(slot.dia, dias),
-    conferidaEm: slot.dia,
-    atrasada: false,
-    entrada: null,
-    diasEmFila: a.diasEmFila ?? null,
-    prazoLimite: a.prazo || null
+    rm: a.rm, cam: a.cam || '(sem CAM)', chegouEm: somaDiasUteis(slot.dia, 1), separadaEm: slot.dia,
+    atrasada: false, prazoDemanda: a.prazo || null, entrada: null, diasEmFila: a.diasEmFila ?? null
   })));
 
-  // Agrupa por dia e por CAM: a Expedição carrega por CAM, não por RM.
-  const porDia = new Map();
+  // ── Blocos de chegada: um por CAM e por dia de chegada ────────────
+  const chegadas = new Map();
   itens.forEach(item => {
-    const chaveDia = item.disponivelEm || 'PROXIMA_SEMANA';
-    if (!porDia.has(chaveDia)) porDia.set(chaveDia, new Map());
-    const grupos = porDia.get(chaveDia);
-    if (!grupos.has(item.cam)) {
+    const chave = `${item.chegouEm}||${item.cam}`;
+    if (!chegadas.has(chave)) {
       const config = porCam?.get(item.cam) || configVazia(item.cam);
-      const rota = prazoDaRota(config, item.disponivelEm || dias[dias.length - 1]);
-      grupos.set(item.cam, {
-        cam: item.cam,
-        config,
-        sigla: config.sigla || item.cam,
-        tratamento: config.tratamento,
-        rota,
-        rms: [],
-        atrasadas: 0,
-        prazoLimite: null
+      const rota = config.tratamento === TRATAMENTOS.GTC ? proximaRota(config, item.chegouEm) : null;
+      const janela = config.tratamento === TRATAMENTOS.STC ? proximaJanela(config, item.chegouEm) : null;
+      chegadas.set(chave, {
+        cam: item.cam, config, sigla: config.sigla || item.cam, tratamento: config.tratamento,
+        chegouEm: item.chegouEm, rota, janela, rms: [], atrasadas: 0,
+        prazoDemanda: null, forcado: forcadosSet.has(item.cam)
       });
     }
-    const g = grupos.get(item.cam);
-    g.rms.push(item);
-    if (item.atrasada) g.atrasadas++;
-    // O prazo mais apertado do bloco manda na urgência dele.
-    if (item.prazoLimite && (!g.prazoLimite || item.prazoLimite < g.prazoLimite)) g.prazoLimite = item.prazoLimite;
+    const b = chegadas.get(chave);
+    b.rms.push(item);
+    if (item.atrasada) b.atrasadas++;
+    b.prazoDemanda = menorData(b.prazoDemanda, item.prazoDemanda);
   });
 
-  const montaDia = (chaveDia, grupos) => {
-    const lista = Array.from(grupos.values()).map(g => {
-      const maisAntiga = g.rms.reduce((m, r) => (r.entrada && (!m || r.entrada < m) ? r.entrada : m), null);
-      return {
-        ...g,
-        maisAntiga,
-        urgencia: urgenciaDe({
-          forcado: forcadosSet.has(g.cam),
-          prazoLimite: g.prazoLimite,
-          rota: g.rota,
-          entrada: maisAntiga,
-          diasEmFila: g.rms.reduce((m, r) => Math.max(m, r.diasEmFila ?? 0), 0) || null
-        })
-      };
+  const blocos = Array.from(chegadas.values()).map(b => {
+    const { prazo, motivo } = prazoDoBloco(b);
+    return { ...b, qtd: b.rms.length, prazo, motivo, saiEm: b.rota || b.janela?.fim || null };
+  });
+
+  // ── Entregas de GTC já lançadas ───────────────────────────────────
+  // Material com documento pronto, esperando o dia da rota. Entra na
+  // linha de produção pelo dia da saída, não pelo da chegada.
+  const entregasProntas = [];
+  (filas?.gtc || []).forEach(g => {
+    if (!g.aEntregar.length) return;
+    const porDoc = new Map();
+    g.aEntregar.forEach(l => {
+      const chave = String(l.documento || '').trim() || '(sem número)';
+      if (!porDoc.has(chave)) porDoc.set(chave, []);
+      porDoc.get(chave).push(l);
     });
-    lista.sort((a, b) => porUrgencia(a.urgencia, b.urgencia));
-    return {
-      dia: chaveDia === 'PROXIMA_SEMANA' ? null : chaveDia,
-      proximaSemana: chaveDia === 'PROXIMA_SEMANA',
-      gtc: lista.filter(g => g.tratamento === TRATAMENTOS.GTC),
-      stc: lista.filter(g => g.tratamento === TRATAMENTOS.STC),
-      semRota: lista.filter(g => g.tratamento !== TRATAMENTOS.GTC && g.tratamento !== TRATAMENTOS.STC),
-      total: lista.reduce((t, g) => t + g.rms.length, 0)
-    };
+    const saida = proximaRota(g.config, hoje) || primeiroDia;
+    entregasProntas.push({
+      cam: g.cam, sigla: g.config.sigla || g.cam, config: g.config,
+      saiEm: saida, qtd: g.aEntregar.length,
+      documentos: Array.from(porDoc.entries()).map(([doc, rms]) => ({ documento: doc, rms })),
+      rms: g.aEntregar,
+      forcado: forcadosSet.has(g.cam)
+    });
+  });
+
+  // ── Monta a agenda: cada dia com as três etapas ───────────────────
+  // Um CAM pode ter dois lotes de chegada que vencem ou saem no mesmo
+  // dia. Para a Expedição isso é um serviço só — um caminhão, um
+  // lançamento —, então os lotes são mesclados por cliente.
+  const mesclarPorCam = (lista) => {
+    const mapa = new Map();
+    lista.forEach(b => {
+      // Os acumuladores entram zerados no espalhamento, senão o
+      // primeiro lote seria contado duas vezes.
+      if (!mapa.has(b.cam)) mapa.set(b.cam, { ...b, qtd: 0, rms: [], documentos: [], aLancar: 0, atrasadas: 0 });
+      const x = mapa.get(b.cam);
+      x.qtd += b.qtd;
+      x.rms = x.rms.concat(b.rms);
+      x.atrasadas += b.atrasadas || 0;
+      if (b.documentos?.length) x.documentos = x.documentos.concat(b.documentos);
+      else x.aLancar += b.qtd;
+      x.forcado = x.forcado || b.forcado;
+    });
+    return Array.from(mapa.values());
   };
 
-  const agenda = dias
-    .filter(d => porDia.has(d))
-    .map(d => montaDia(d, porDia.get(d)));
-  const sobra = porDia.has('PROXIMA_SEMANA') ? montaDia('PROXIMA_SEMANA', porDia.get('PROXIMA_SEMANA')) : null;
+  const ordenar = (lista, campo) => lista.slice().sort((a, b) => {
+    if (Boolean(a.forcado) !== Boolean(b.forcado)) return a.forcado ? -1 : 1;
+    if (a[campo] && b[campo] && a[campo] !== b[campo]) return a[campo].localeCompare(b[campo]);
+    return b.qtd - a.qtd;
+  });
+
+  const dentroDaSemana = (data) => Boolean(data) && data >= primeiroDia && data <= ultimoDia;
+
+  const agenda = dias.map(dia => {
+    const chegar = ordenar(mesclarPorCam(blocos.filter(b => b.chegouEm === dia)), 'prazo');
+    const entregar = ordenar(mesclarPorCam([
+      ...entregasProntas.filter(e => e.saiEm === dia),
+      ...blocos.filter(b => b.tratamento === TRATAMENTOS.GTC && b.rota === dia)
+    ]), 'saiEm');
+    const atender = ordenar(mesclarPorCam(blocos.filter(b => b.tratamento === TRATAMENTOS.STC && b.prazo === dia)), 'prazo');
+    return {
+      dia,
+      chegar, entregar, atender,
+      total: chegar.reduce((t, b) => t + b.qtd, 0),
+      temTrabalho: chegar.length + entregar.length + atender.length > 0
+    };
+  });
+
+  // O que cai depois da semana programada não some: aparece junto, com
+  // a data real, para a Expedição saber o que já está encomendado.
+  const depois = {
+    chegar: ordenar(mesclarPorCam(blocos.filter(b => !dentroDaSemana(b.chegouEm))), 'chegouEm'),
+    entregar: ordenar(mesclarPorCam([
+      ...entregasProntas.filter(e => !dentroDaSemana(e.saiEm)),
+      ...blocos.filter(b => b.tratamento === TRATAMENTOS.GTC && b.rota && !dentroDaSemana(b.rota))
+    ]), 'saiEm'),
+    atender: ordenar(mesclarPorCam(blocos.filter(b => b.tratamento === TRATAMENTOS.STC && !dentroDaSemana(b.prazo))), 'prazo')
+  };
+  depois.temTrabalho = depois.chegar.length + depois.entregar.length + depois.atender.length > 0;
 
   return {
     hoje,
     agenda,
-    sobra,
+    depois,
+    blocos,
+    entregasProntas,
     temPlano: Boolean(snapshot),
     resumo: {
       total: itens.length,
       atrasadas: itens.filter(i => i.atrasada).length,
       doPlano: itens.filter(i => !i.atrasada).length,
-      proximaSemana: sobra?.total || 0
+      aEntregar: entregasProntas.reduce((t, e) => t + e.qtd, 0),
+      foraDaSemana: blocos.filter(b => !dentroDaSemana(b.chegouEm)).reduce((t, b) => t + b.qtd, 0)
     }
   };
 };

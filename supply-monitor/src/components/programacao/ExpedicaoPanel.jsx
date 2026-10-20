@@ -3,7 +3,7 @@ import { Truck, PackageCheck, Clock, AlertTriangle, ChevronDown, ChevronRight, F
 import SectionLabel from '../SectionLabel';
 import DocumentoExpedicaoCard from './DocumentoExpedicaoCard';
 import { NIVEIS_COBRANCA, rotaDescrita } from '../../utils/programacao/rotas';
-import { formatarBr, DIAS_SEMANA } from '../../utils/programacao/semana';
+import { formatarBr, DIAS_SEMANA, somaDiasUteis } from '../../utils/programacao/semana';
 
 const TOM_TEXTO = { emerald: 'text-emerald-600', amber: 'text-amber-600', red: 'text-red-600', slate: 'text-slate-500', indigo: 'text-indigo-600' };
 const TOM_BADGE = {
@@ -15,7 +15,7 @@ const TOM_BADGE = {
 };
 
 const FILAS = [
-  { key: 'agenda', label: 'Agenda da semana', desc: 'O que prontificar em cada dia, na ordem — vem da programação da separação' },
+  { key: 'agenda', label: 'Agenda da semana', desc: 'O que chega, o que sai e o que vence em cada dia — vem da programação da separação' },
   { key: 'stc', label: 'Prontificar STC', desc: 'Termina quando a STC está lançada em todas as RM não canceladas do CAM' },
   { key: 'gtc', label: 'Fornecer GTC', desc: 'Entrega nossa, por dia de rota — só termina em EXPEDIDO' },
   { key: 'cobranca', label: 'Cobrar a retirada', desc: 'Documento já lançado, aguardando o CDAM (ou a empresa) vir buscar — o que não depende de nós' }
@@ -43,52 +43,64 @@ const ListaRms = ({ rms, limite = 12 }) => {
   );
 };
 
-// Um dia da agenda: o que a Expedição recebe e em que ordem atacar.
-// GTC e STC aparecem separados porque o trabalho é diferente — um termina
-// no caminhão, o outro no lançamento da STC.
-const BlocoDoDia = ({ bloco }) => {
-  const secoes = [
-    { key: 'gtc', titulo: 'GTC — entrega nossa', grupos: bloco.gtc },
-    { key: 'stc', titulo: 'STC — lançar e aguardar o CDAM', grupos: bloco.stc },
-    { key: 'semRota', titulo: 'Sem rota cadastrada', grupos: bloco.semRota }
-  ].filter(s => s.grupos.length > 0);
-
+// Um dia da linha de produção: o que chega, o que sai e o que vence.
+// As três etapas vêm separadas porque são trabalhos diferentes — montar
+// mapa, carregar caminhão e lançar STC — e quem faz cada uma precisa ver
+// a sua lista sem ler as outras.
+const Etapa = ({ titulo, cor, blocos, coluna }) => {
+  if (!blocos.length) return null;
   return (
-    <div className="border-b border-slate-100 last:border-0">
-      <div className="px-5 py-3 bg-slate-50/70 flex items-center justify-between gap-3">
-        <p className="text-sm font-black text-slate-800">
-          {bloco.proximaSemana
-            ? 'Segunda seguinte'
-            : `${DIAS_SEMANA[new Date(bloco.dia + 'T00:00:00Z').getUTCDay()]}, ${formatarBr(bloco.dia)}`}
-        </p>
-        <p className="text-[11px] font-bold text-slate-400">{bloco.total} RM(s)</p>
-      </div>
-      {secoes.map(sec => (
-        <div key={sec.key} className="px-5 py-3">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{sec.titulo}</p>
-          <div className="space-y-1.5">
-            {sec.grupos.map((g, i) => (
-              <div key={g.cam} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
-                <span className="w-5 text-[11px] font-black text-slate-300 shrink-0">{i + 1}º</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">{g.sigla}</p>
-                  <p className="text-[11px] text-slate-400 font-medium truncate">{g.urgencia.texto}</p>
-                </div>
-                <span className={`text-[10px] font-black px-2 py-1 rounded-lg shrink-0 ${TOM_BADGE[g.urgencia.motivo.tom] || TOM_BADGE.slate}`}>
-                  {g.urgencia.motivo.curto}
-                </span>
-                {g.atrasadas > 0 && (
-                  <span className="text-[10px] font-bold text-amber-600 shrink-0 hidden sm:inline">{g.atrasadas} atrasada(s)</span>
-                )}
-                <span className="text-sm font-black text-slate-900 w-10 text-right shrink-0">{g.rms.length}</span>
-              </div>
-            ))}
+    <div className="px-5 py-3">
+      <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${cor}`}>
+        {titulo} · {blocos.reduce((t, b) => t + b.qtd, 0)} RM
+      </p>
+      <div className="space-y-1.5">
+        {blocos.map((b, i) => (
+          <div key={`${b.cam}-${i}`} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-slate-800 truncate">{b.sigla}</p>
+              <p className="text-[11px] text-slate-400 font-medium truncate">{coluna(b)}</p>
+            </div>
+            {b.forcado && <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-fuchsia-100 text-fuchsia-700 shrink-0">FORÇADO</span>}
+            {b.atrasadas > 0 && <span className="text-[10px] font-bold text-amber-600 shrink-0 hidden sm:inline">{b.atrasadas} atrasada(s)</span>}
+            <span className="text-sm font-black text-slate-900 w-10 text-right shrink-0">{b.qtd}</span>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };
+
+const BlocoDoDia = ({ bloco, rotulo, nota }) => (
+  <div className="border-b border-slate-100 last:border-0">
+    <div className="px-5 py-3 bg-slate-50/70">
+      <p className="text-sm font-black text-slate-800">{rotulo}</p>
+      {nota && <p className="text-[11px] text-slate-400 font-medium">{nota}</p>}
+    </div>
+    <Etapa
+      titulo="Recebido da estocagem — prontificar"
+      cor="text-slate-500"
+      blocos={bloco.chegar}
+      coluna={b => `Prontificar até ${formatarBr(b.prazo)} · ${b.motivo}`}
+    />
+    <Etapa
+      titulo="Entregar — GTC que saem"
+      cor="text-emerald-600"
+      blocos={bloco.entregar}
+      coluna={b => (b.documentos?.length
+        ? (b.documentos.length <= 2
+          ? `${b.documentos.map(x => x.documento).join(', ')} — lançada`
+          : `${b.documentos.length} documentos lançados`)
+        : 'documento a lançar antes da saída')}
+    />
+    <Etapa
+      titulo="Atender — STC que vencem hoje"
+      cor="text-amber-600"
+      blocos={bloco.atender}
+      coluna={b => (b.janela ? `Janela do CDAM até ${formatarBr(b.janela.fim)} · ${b.motivo}` : b.motivo)}
+    />
+  </div>
+);
 
 // Uma linha por CAM: o que falta, há quanto tempo e quando é a próxima
 // saída. O CAM é a unidade porque é assim que a Expedição carrega.
@@ -256,12 +268,25 @@ const ExpedicaoPanel = ({ filas, projecao, semanaRef, programador, encarregado, 
                 separação vai entregar em cada dia.
               </p>
             )}
-            {projecao.agenda.length === 0 && !projecao.sobra
-              ? <p className="px-6 py-10 text-center text-sm text-slate-400 italic">Nada a prontificar nesta semana.</p>
+            {!projecao.agenda.some(d => d.temTrabalho) && !projecao.depois?.temTrabalho
+              ? <p className="px-6 py-10 text-center text-sm text-slate-400 italic">Nada a fazer nesta semana.</p>
               : (
                 <>
-                  {projecao.agenda.map(b => <BlocoDoDia key={b.dia} bloco={b} />)}
-                  {projecao.sobra && <BlocoDoDia bloco={projecao.sobra} />}
+                  {projecao.agenda.filter(d => d.temTrabalho).map(d => (
+                    <BlocoDoDia
+                      key={d.dia}
+                      bloco={d}
+                      rotulo={`${DIAS_SEMANA[new Date(d.dia + 'T00:00:00Z').getUTCDay()]}, ${formatarBr(d.dia)}`}
+                      nota={`Recebe o que a estocagem concluiu em ${formatarBr(somaDiasUteis(d.dia, -1))}.`}
+                    />
+                  ))}
+                  {projecao.depois?.temTrabalho && (
+                    <BlocoDoDia
+                      bloco={projecao.depois}
+                      rotulo="Depois desta semana"
+                      nota="Já encomendado pela programação, com as datas reais."
+                    />
+                  )}
                 </>
               )}
           </>
