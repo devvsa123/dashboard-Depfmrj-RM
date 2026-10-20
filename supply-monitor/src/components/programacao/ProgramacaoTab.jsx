@@ -186,10 +186,6 @@ const ProgramacaoTab = (p) => {
       />
     ) : (
     <>
-    {p.resultado && <GradeSemanal resultado={p.resultado} />}
-
-    {p.resultado && <GradesPanel grades={p.resultado.gradesConsideradas} resumo={p.resultado.resumo} />}
-
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <DemandasPanel demandas={p.demandas} adicionarDemanda={p.adicionarDemanda} removerDemanda={p.removerDemanda} />
       <div className="space-y-6">
@@ -215,6 +211,14 @@ const ProgramacaoTab = (p) => {
         <BloqueiosPanel bloqueios={p.bloqueios} adicionarBloqueio={p.adicionarBloqueio} removerBloqueio={p.removerBloqueio} diasDaSemana={p.diasDaSemana} />
       </div>
     </div>
+
+    {/* A página segue a ordem do trabalho: primeiro o que o programador
+        informa, depois a grade que sai disso, e só então a publicação.
+        Ver a grade antes de informar os dados mostrava uma proposta que
+        ainda ia mudar. */}
+    {p.resultado && <GradeSemanal resultado={p.resultado} />}
+
+    {p.resultado && <GradesPanel grades={p.resultado.gradesConsideradas} resumo={p.resultado.resumo} />}
 
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <VersoesPanel
