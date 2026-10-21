@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { FileDown, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { FileDown, FileSpreadsheet, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import InfoButton from '../InfoButton';
 import { gerarPdfSeparacao } from '../../utils/programacao/documentoSeparacao';
+import { exportarExcelSeparacao } from '../../utils/programacao/planilhaProgramacao';
 import { formatarBr } from '../../utils/programacao/semana';
 import { compararVersoes, rotuloVersao, dataDaPublicacao } from '../../utils/programacao/versoes';
 
@@ -9,6 +10,7 @@ import { compararVersoes, rotuloVersao, dataDaPublicacao } from '../../utils/pro
 // senão o PDF impresso poderia divergir do que foi publicado.
 const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, programador, encarregado, setEncarregado }) => {
   const [gerando, setGerando] = useState(false);
+  const [gerandoExcel, setGerandoExcel] = useState(false);
   const [erro, setErro] = useState('');
 
   const anterior = versoes.length > 1 ? versoes[versoes.length - 2] : null;
@@ -45,6 +47,22 @@ const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, program
     }
   };
 
+  // A planilha é a mesma programação em formato de manuseio: tem uma aba
+  // com uma linha por RM, em ordem de liberação, para trabalhar a reserva
+  // no WMS. Quem assina é o PDF.
+  const gerarExcel = () => {
+    setErro('');
+    setGerandoExcel(true);
+    try {
+      exportarExcelSeparacao({ snapshot: ultimaVersao.snapshot, semanaRef, versao, emitidoEm });
+    } catch (e) {
+      console.error(e);
+      setErro(`Não foi possível gerar o Excel: ${e?.message || e}`);
+    } finally {
+      setGerandoExcel(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
       <div className="flex items-center gap-2">
@@ -52,7 +70,7 @@ const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, program
         <h3 className="text-lg font-black text-slate-800">Documento da Programação</h3>
         <InfoButton
           title="O que sai no PDF"
-          description="Um documento A4 com o resumo da semana, a grade de atendimento por CAM, os dias sem separação, as demandas com prazo e as observações — mais o Anexo A, que detalha por dia o que será atendido e por quê. A partir da segunda versão entra também o Anexo B, com o que mudou em relação à anterior. O documento sai sempre da versão publicada, não do que está na tela: publique antes de baixar."
+          description="Sai em dois formatos: o PDF, que é o arquivo de assinatura, e o Excel, para manusear as RMs no WMS — a planilha tem uma aba com uma linha por RM em ordem de data de liberação. Um documento A4 com o resumo da semana, a grade de atendimento por CAM, os dias sem separação, as demandas com prazo e as observações — mais o Anexo A, que detalha por dia o que será atendido e por quê. A partir da segunda versão entra também o Anexo B, com o que mudou em relação à anterior. O documento sai sempre da versão publicada, não do que está na tela: publique antes de baixar."
         />
       </div>
 
@@ -82,14 +100,24 @@ const DocumentoCard = ({ versoes, ultimaVersao, diffPendente, semanaRef, program
             ? `${versao} · ${ultimaVersao.snapshot.resumo.totalProgramado} RMs · ${ultimaVersao.snapshot.resumo.camsAtendidos} CAMs${diff ? ` · Anexo B com ${diff.totalMudancas} mudança(s)` : ''}`
             : 'Publique a programação da semana para poder baixar o documento.'}
         </p>
-        <button
-          onClick={gerar}
-          disabled={!ultimaVersao || gerando}
-          className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-40 transition-all active:scale-95"
-        >
-          {gerando ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
-          {gerando ? 'Gerando PDF...' : 'Baixar documento'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={gerarExcel}
+            disabled={!ultimaVersao || gerandoExcel}
+            className="px-4 py-2 rounded-xl bg-white border border-emerald-200 text-emerald-700 font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-emerald-50 disabled:opacity-40 transition-all active:scale-95"
+          >
+            {gerandoExcel ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+            {gerandoExcel ? 'Gerando...' : 'Baixar Excel'}
+          </button>
+          <button
+            onClick={gerar}
+            disabled={!ultimaVersao || gerando}
+            className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-40 transition-all active:scale-95"
+          >
+            {gerando ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            {gerando ? 'Gerando PDF...' : 'Baixar PDF'}
+          </button>
+        </div>
       </div>
 
       {erro && <p className="flex items-center gap-2 text-red-600 text-xs font-bold"><AlertCircle size={14} /> {erro}</p>}

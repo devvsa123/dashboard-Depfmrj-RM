@@ -1,7 +1,7 @@
 import { criarDocumento, TINTA, SUAVE, VERMELHO, AMBAR } from './pdfTexto';
 import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana } from './semana';
 import { ORIGENS, limiteDeSeparacao } from './motor';
-import { agruparParaAnexo } from './versoes';
+import { agruparParaAnexo, ordemDeLiberacao, sufixoDeArquivo } from './versoes';
 
 // -----------------------------------------------------------------------
 // Documento da programação semanal da separação. Escrito como texto pelo
@@ -188,10 +188,12 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
       const chave = ehFila(a.origem) ? `FILA||${cam}` : `${a.justificativa}||${cam}`;
       if (!grupos.has(chave)) grupos.set(chave, { justificativa: a.justificativa, cam, origem: a.origem, rms: [], dias: [] });
       const g = grupos.get(chave);
-      g.rms.push(a.rm);
+      g.rms.push({ rm: a.rm, entrada: a.entrada || null });
       if (a.diasEmFila != null) g.dias.push(a.diasEmFila);
     });
     grupos.forEach(g => {
+      // Ordem de liberação, mais antiga em cima — a mesma do WMS.
+      g.rms.sort(ordemDeLiberacao);
       if (!ehFila(g.origem) || !g.dias.length) return;
       const min = Math.min(...g.dias);
       const max = Math.max(...g.dias);
@@ -208,7 +210,8 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
       subtitulo: `Semana de ${rotuloSemana(semanaRef)} · ${versao} · emitido em ${emitidoEm}`
     });
     p.paragrafo('Relação das RMs programadas, por dia, com a razão de cada bloco estar na grade. As RMs de uma mesma '
-      + 'origem e mesmo CAM aparecem agrupadas numa linha só.');
+      + 'origem e mesmo CAM aparecem agrupadas numa linha só, na ordem de liberação do WMS — mais antiga primeiro, '
+      + 'com a data ao lado.');
     anexo.forEach(({ slot, grupos }) => {
       p.reservar(22);
       p.texto(`${diaPorExtenso(slot.dia)} — ${slot.alocacoes.length} RM(s)`,
@@ -218,7 +221,7 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
         p.reservar(12);
         p.texto(`${g.cam} — ${g.rms.length} RM(s)   ·   ${g.justificativa}`,
           { tamanho: 8, estilo: 'bold', cor: TINTA, espacoDepois: 0.5 });
-        p.gradeDeRms(g.rms.map(rm => ({ rm })));
+        p.gradeDeRms(g.rms.map(r => ({ rm: r.rm, nota: r.entrada ? formatarBr(r.entrada).slice(0, 5) : '' })), { colunas: 5 });
       });
       p.y += 2;
     });
@@ -277,7 +280,7 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
         p.reservar(12);
         p.texto(`${g.cam} — ${g.rms.length} RM(s)   ·   ${g.justificativa}`,
           { tamanho: 8, estilo: 'bold', cor: TINTA, espacoDepois: 0.5 });
-        p.gradeDeRms(g.rms.map(rm => ({ rm })));
+        p.gradeDeRms(g.rms.map(r => ({ rm: r.rm, nota: r.entrada ? formatarBr(r.entrada).slice(0, 5) : '' })), { colunas: 5 });
       });
       p.y += 2;
     });
@@ -288,15 +291,16 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
       p.regua([203, 213, 225], 0.2, 2);
       const porMudanca = diff.remanejadas.reduce((acc, a) => {
         const chave = `${a.diaAnterior}→${a.dia}`;
-        (acc[chave] = acc[chave] || []).push(a.rm);
+        (acc[chave] = acc[chave] || []).push({ rm: a.rm, entrada: a.entrada || null });
         return acc;
       }, {});
+      Object.values(porMudanca).forEach(lista => lista.sort(ordemDeLiberacao));
       Object.entries(porMudanca).forEach(([chave, rms]) => {
         const [de, para] = chave.split('→');
         p.reservar(12);
         p.texto(`De ${formatarBr(de)} para ${formatarBr(para)} — ${rms.length} RM(s)`,
           { tamanho: 8, estilo: 'bold', cor: TINTA, espacoDepois: 0.5 });
-        p.gradeDeRms(rms.map(rm => ({ rm })));
+        p.gradeDeRms(rms.map(r => ({ rm: r.rm || r, nota: r.entrada ? formatarBr(r.entrada).slice(0, 5) : '' })), { colunas: 5 });
       });
     }
 
@@ -305,6 +309,6 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
     }
   }
 
-  const sufixo = versao && versao.toLowerCase().includes('original') ? 'Original' : versao.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const sufixo = sufixoDeArquivo(versao);
   p.salvar(`Programacao_Semanal_${semanaRef}_${sufixo}.pdf`);
 };

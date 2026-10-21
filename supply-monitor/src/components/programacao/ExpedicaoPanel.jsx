@@ -47,50 +47,49 @@ const ListaRms = ({ rms, limite = 12 }) => {
 // As três etapas vêm separadas porque são trabalhos diferentes — montar
 // mapa, carregar caminhão e lançar STC — e quem faz cada uma precisa ver
 // a sua lista sem ler as outras.
-const Etapa = ({ titulo, cor, blocos, coluna, andamento }) => {
-  if (!blocos.length) return null;
-  return (
-    <div className="px-5 py-3">
-      <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${cor}`}>
-        {titulo} · {blocos.reduce((t, b) => t + b.qtd, 0)} RM
-      </p>
-      <div className="space-y-1.5">
-        {blocos.map((b, i) => (
-          <div key={`${b.cam}-${i}`} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-800 truncate">{b.sigla}</p>
-              <p className="text-[11px] text-slate-400 font-medium truncate">{coluna(b)}</p>
-            </div>
-            {b.forcado && <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-fuchsia-100 text-fuchsia-700 shrink-0">FORÇADO</span>}
-            {andamento && <span className="text-[10px] font-bold text-slate-400 shrink-0 hidden sm:inline">{andamento(b)}</span>}
-            <span className="text-sm font-black text-slate-900 w-10 text-right shrink-0">{b.qtd}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+const TOM_ACAO = {
+  PRONTIFICAR: 'bg-amber-100 text-amber-700',
+  PRONTIFICAR_E_ENTREGAR: 'bg-violet-100 text-violet-700',
+  ENTREGAR: 'bg-emerald-100 text-emerald-700'
 };
 
+// "hoje" só vale dentro do dia que titula o bloco; no que fica para
+// depois da semana a data vai escrita.
+const proximoPasso = (b, dia) => {
+  if (b.acao.key !== 'PRONTIFICAR' && b.entregarEm) {
+    return b.entregarEm === dia ? 'Entregar hoje' : `Entregar em ${formatarBr(b.entregarEm)}`;
+  }
+  if (b.entregarEm) return `Entregar em ${formatarBr(b.entregarEm)}`;
+  if (b.janela) return `Aprovar STC até ${formatarBr(b.janela.fim)}`;
+  return '';
+};
+
+// Um dia da ordem de serviço: uma linha por cliente, com a ação escrita.
 const BlocoDoDia = ({ bloco, rotulo, nota }) => (
   <div className="border-b border-slate-100 last:border-0">
-    <div className="px-5 py-3 bg-slate-50/70">
-      <p className="text-sm font-black text-slate-800">{rotulo}</p>
-      {nota && <p className="text-[11px] text-slate-400 font-medium">{nota}</p>}
+    <div className="px-5 py-3 bg-slate-50/70 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm font-black text-slate-800">{rotulo}</p>
+        {nota && <p className="text-[11px] text-slate-400 font-medium">{nota}</p>}
+      </div>
+      <p className="text-[11px] font-bold text-slate-400 shrink-0">{bloco.total} RM</p>
     </div>
-    <Etapa
-      titulo="Prontificar — lançar STC ou GTC"
-      cor="text-amber-600"
-      blocos={bloco.prontificar}
-      coluna={b => `Lançar ${b.documentoEsperado} até ${formatarBr(b.prazo)} · ${b.motivo}`}
-      andamento={b => (b.falta ? `faltam ${b.falta}` : 'tudo lançado')}
-    />
-    <Etapa
-      titulo="Entregar — GTC que saem hoje"
-      cor="text-emerald-600"
-      blocos={bloco.entregar}
-      coluna={() => "Rota do CAM — fechar em EXPEDIDO"}
-      andamento={b => `${b.qtd - b.expedidas} a expedir`}
-    />
+    <div className="px-5 py-2">
+      {bloco.linhas.map((b, i) => (
+        <div key={`${b.cam}-${i}`} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-slate-800 truncate">{b.sigla}</p>
+            <p className="text-[11px] text-slate-400 font-medium truncate">
+              {b.acao.key === 'ENTREGAR' ? proximoPasso(b, bloco.dia) : `Lançar ${b.documentoEsperado} até ${formatarBr(b.prazo)}`}
+              {b.acao.key !== 'ENTREGAR' && proximoPasso(b, bloco.dia) ? ` · ${proximoPasso(b, bloco.dia)}` : ''}
+            </p>
+          </div>
+          {b.forcado && <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-fuchsia-100 text-fuchsia-700 shrink-0">FORÇADO</span>}
+          <span className={`text-[10px] font-black px-2 py-1 rounded-lg shrink-0 ${TOM_ACAO[b.acao.key]}`}>{b.acao.label}</span>
+          <span className="text-sm font-black text-slate-900 w-10 text-right shrink-0">{b.qtd}</span>
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -276,7 +275,7 @@ const ExpedicaoPanel = ({ filas, projecao, semanaRef, programador, encarregado, 
                     <BlocoDoDia
                       bloco={projecao.depois}
                       rotulo="Depois desta semana"
-                      nota="Já encomendado pela programação, com as datas reais."
+                      nota="Separado no fim da semana ou com rota na semana seguinte."
                     />
                   )}
                 </>

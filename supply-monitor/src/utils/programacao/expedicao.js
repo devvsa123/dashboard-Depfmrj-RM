@@ -219,6 +219,15 @@ export const janelasDaSemana = (filas, inicioSemana, fimSemana) =>
 
 export const DIAS_EXPEDICAO = 3;
 
+// O que a Expedição faz com um lote num dia. "Prontificar" é lançar o
+// documento em todas as RMs; "entregar" é fechar a GTC em EXPEDIDO no
+// dia da rota. Quando os dois caem no mesmo dia vira um serviço só.
+export const ACOES = {
+  PRONTIFICAR: { key: 'PRONTIFICAR', label: 'Prontificar' },
+  PRONTIFICAR_E_ENTREGAR: { key: 'PRONTIFICAR_E_ENTREGAR', label: 'Prontificar e entregar' },
+  ENTREGAR: { key: 'ENTREGAR', label: 'Entregar' }
+};
+
 export const ESTADOS = {
   NAO_CHEGOU: { key: 'NAO_CHEGOU', label: 'ainda na separação', tom: 'slate' },
   A_PRONTIFICAR: { key: 'A_PRONTIFICAR', label: 'a prontificar', tom: 'amber' },
@@ -245,15 +254,19 @@ const estadoDaRm = (info) => {
 
 const menorData = (a, b) => (!a ? b : !b ? a : (a <= b ? a : b));
 
-const prazoDoBloco = ({ chegouEm, prazoDemanda, rota, forcado }) => {
-  // Texto curto: numa tabela de trinta linhas a regra inteira repetida
-  // vira ruído. A regra está no texto da seção; aqui só é preciso dizer
-  // QUAL dos prazos mandou.
+// O prazo de PRONTIFICAR — deixar todas as RMs do lote com o número da
+// STC ou da GTC. São 3 dias úteis contados da chegada, ou o prazo da
+// mensagem quando a RM veio de uma demanda prioritária.
+//
+// A rota NÃO entra aqui. Ela é o prazo da ENTREGA, que é outro trabalho
+// e tem data própria. Misturar os dois escondia a conta: um CAM com
+// rota amanhã passava a ter "prontificar até amanhã", e a Expedição
+// perdia a referência do próprio prazo.
+const prazoDoBloco = ({ chegouEm, prazoDemanda, forcado }) => {
   const candidatos = [
     { data: somaDiasUteis(chegouEm, DIAS_EXPEDICAO), motivo: `Prazo da Expedição (${DIAS_EXPEDICAO} d. úteis)` }
   ];
   if (prazoDemanda) candidatos.push({ data: prazoDemanda, motivo: `Prazo de mensagem (${formatarBr(prazoDemanda)})` });
-  if (rota) candidatos.push({ data: rota, motivo: `Rota do CAM (${formatarBr(rota)})` });
   const vencedor = candidatos.reduce((a, b) => (a.data <= b.data ? a : b));
   return {
     prazo: vencedor.data,
@@ -278,6 +291,9 @@ export const projetarExpedicao = ({ snapshot, indiceWms, dias, porCam, forcados 
       prazoDemanda: a.prazo || null,
       estado: estadoDaRm(info),
       documento: info?.documento || '',
+      // Data de liberação: é por ela que o WMS ordena as RMs, mais
+      // antigas em cima, e é assim que a reserva é manuseada lá.
+      entrada: a.entrada || info?.entrada || null,
       // O tipo vem do documento que ESTÁ lançado, não do que o cadastro
       // esperava: é possível lançar uma STC num CAM de GTC, e o anexo
       // precisa dizer o que há, não o que deveria haver.
@@ -307,7 +323,16 @@ export const projetarExpedicao = ({ snapshot, indiceWms, dias, porCam, forcados 
 
   const contar = (rms, estado) => rms.filter(r => r.estado === estado).length;
 
+  // Ordena cada lote pela data de liberação, mais antiga em cima.
+  const porLiberacao = (a, b) => {
+    if (a.entrada && b.entrada && a.entrada !== b.entrada) return a.entrada.localeCompare(b.entrada);
+    if (a.entrada && !b.entrada) return -1;
+    if (!a.entrada && b.entrada) return 1;
+    return String(a.rm).localeCompare(String(b.rm));
+  };
+
   const blocos = Array.from(porChegada.values()).map(b => {
+    b.rms.sort(porLiberacao);
     const { prazo, motivo } = prazoDoBloco(b);
     const docEsperado = b.config.documentoEsperado
       || (b.tratamento === TRATAMENTOS.GTC ? 'GTC' : b.tratamento === TRATAMENTOS.STC ? 'STC' : '—');
@@ -316,6 +341,9 @@ export const projetarExpedicao = ({ snapshot, indiceWms, dias, porCam, forcados 
       qtd: b.rms.length,
       prazo,
       motivo,
+      // O dia em que a GTC sai. É o prazo da ENTREGA, não o da
+      // prontificação — os dois convivem e cada um tem a sua data.
+      entregarEm: b.tratamento === TRATAMENTOS.GTC ? b.rota : null,
       documentoEsperado: docEsperado,
       naSeparacao: contar(b.rms, ESTADOS.NAO_CHEGOU),
       aProntificar: contar(b.rms, ESTADOS.A_PRONTIFICAR),
@@ -328,8 +356,8 @@ export const projetarExpedicao = ({ snapshot, indiceWms, dias, porCam, forcados 
     };
   });
 
-  // Um CAM pode ter dois lotes que chegam ou saem no mesmo dia. Para a
-  // Expedição é um serviço só — um lançamento, um caminhão.
+  // Um CAM pode ter dois lotes que chegam no mesmo dia. Para a Expedição
+  // é um serviço só — um lançamento, um caminhão.
   const mesclarPorCam = (lista) => {
     const mapa = new Map();
     lista.forEach(b => {
@@ -348,41 +376,60 @@ export const projetarExpedicao = ({ snapshot, indiceWms, dias, porCam, forcados 
       x.aEntregar += b.aEntregar;
       x.expedidas += b.expedidas;
       x.prazo = menorData(x.prazo, b.prazo);
+      x.entregarEm = menorData(x.entregarEm, b.entregarEm);
       x.forcado = x.forcado || b.forcado;
     });
-    return Array.from(mapa.values());
+    const saida = Array.from(mapa.values());
+    saida.forEach(b => b.rms.sort(porLiberacao));
+    return saida;
   };
 
-  const ordenar = (lista, campo) => lista.slice().sort((a, b) => {
+  const ordenar = (lista) => lista.slice().sort((a, b) => {
     if (Boolean(a.forcado) !== Boolean(b.forcado)) return a.forcado ? -1 : 1;
-    if (a[campo] && b[campo] && a[campo] !== b[campo]) return a[campo].localeCompare(b[campo]);
+    if (a.prazo && b.prazo && a.prazo !== b.prazo) return a.prazo.localeCompare(b.prazo);
     return b.qtd - a.qtd;
   });
 
   const naSemana = (data) => Boolean(data) && data >= primeiroDia && data <= ultimoDia;
 
+  // Uma linha por CAM por dia, com a AÇÃO escrita. O CAM de GTC aparece
+  // duas vezes só quando a rota cai noutro dia que não o da chegada —
+  // e aí são dois trabalhos mesmo: lançar hoje, carregar depois.
+  const linhasDoDia = (dia) => {
+    const chegando = mesclarPorCam(blocos.filter(b => b.chegouEm === dia));
+    const linhas = chegando.map(b => ({
+      ...b,
+      acao: b.entregarEm === dia ? ACOES.PRONTIFICAR_E_ENTREGAR : ACOES.PRONTIFICAR
+    }));
+    // Entregas de lotes que chegaram em outro dia.
+    const jaListados = new Set(chegando.map(b => b.cam));
+    mesclarPorCam(blocos.filter(b => b.entregarEm === dia && b.chegouEm !== dia && !jaListados.has(b.cam)))
+      .forEach(b => linhas.push({ ...b, acao: ACOES.ENTREGAR }));
+    return ordenar(linhas);
+  };
+
   const agenda = dias.map(dia => {
-    const prontificar = ordenar(mesclarPorCam(blocos.filter(b => b.chegouEm === dia)), 'prazo');
-    // Entrega: GTC cuja rota é hoje e que ainda não saiu inteira.
-    const entregar = ordenar(mesclarPorCam(
-      blocos.filter(b => b.tratamento === TRATAMENTOS.GTC && b.rota === dia && b.expedidas < b.qtd)
-    ), 'rota');
+    const linhas = linhasDoDia(dia);
     return {
       dia,
-      prontificar,
-      entregar,
-      total: prontificar.reduce((t, b) => t + b.qtd, 0),
-      temTrabalho: prontificar.length + entregar.length > 0
+      linhas,
+      total: linhas.reduce((t, b) => t + b.qtd, 0),
+      temTrabalho: linhas.length > 0
     };
   });
 
+  const foraDaSemana = blocos.filter(b => !naSemana(b.chegouEm));
+  const entregasFora = blocos.filter(b => b.entregarEm && !naSemana(b.entregarEm) && naSemana(b.chegouEm));
   const depois = {
-    prontificar: ordenar(mesclarPorCam(blocos.filter(b => !naSemana(b.chegouEm))), 'chegouEm'),
-    entregar: ordenar(mesclarPorCam(
-      blocos.filter(b => b.tratamento === TRATAMENTOS.GTC && b.rota && !naSemana(b.rota) && b.expedidas < b.qtd)
-    ), 'rota')
+    linhas: ordenar([
+      ...mesclarPorCam(foraDaSemana).map(b => ({
+        ...b, acao: b.entregarEm === b.chegouEm ? ACOES.PRONTIFICAR_E_ENTREGAR : ACOES.PRONTIFICAR
+      })),
+      ...mesclarPorCam(entregasFora).map(b => ({ ...b, acao: ACOES.ENTREGAR }))
+    ])
   };
-  depois.temTrabalho = depois.prontificar.length + depois.entregar.length > 0;
+  depois.temTrabalho = depois.linhas.length > 0;
+  depois.total = depois.linhas.reduce((t, b) => t + b.qtd, 0);
 
   const soma = (campo) => blocos.reduce((t, b) => t + b[campo], 0);
 
@@ -391,6 +438,7 @@ export const projetarExpedicao = ({ snapshot, indiceWms, dias, porCam, forcados 
     agenda,
     depois,
     blocos,
+    dias,
     temPlano: Boolean(snapshot),
     resumo: {
       total: itens.length,
@@ -400,7 +448,11 @@ export const projetarExpedicao = ({ snapshot, indiceWms, dias, porCam, forcados 
       prontas: soma('prontas'),
       aEntregar: soma('aEntregar'),
       expedidas: soma('expedidas'),
-      foraDaSemana: blocos.filter(b => !naSemana(b.chegouEm)).reduce((t, b) => t + b.qtd, 0)
+      foraDaSemana: foraDaSemana.reduce((t, b) => t + b.qtd, 0),
+      gtc: blocos.filter(b => b.tratamento === TRATAMENTOS.GTC).reduce((t, b) => t + b.qtd, 0),
+      stc: blocos.filter(b => b.tratamento === TRATAMENTOS.STC).reduce((t, b) => t + b.qtd, 0),
+      cams: new Set(blocos.map(b => b.cam)).size,
+      entregas: blocos.filter(b => b.entregarEm).reduce((t, b) => t + b.qtd, 0)
     }
   };
 };

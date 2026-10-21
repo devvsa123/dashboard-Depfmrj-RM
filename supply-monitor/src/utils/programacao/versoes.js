@@ -41,7 +41,11 @@ export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
       origem: a.origem,
       justificativa: a.justificativa,
       prazo: a.prazo || null,
-      diasEmFila: a.diasEmFila ?? null
+      diasEmFila: a.diasEmFila ?? null,
+      // A data de liberação da RM no WMS. Vai no snapshot porque é por
+      // ela que as listas são ordenadas: é assim que o WMS mostra as
+      // RMs, mais antigas em cima, e é assim que a reserva é manuseada.
+      entrada: a.entrada || null
     }))
   })),
   porCam: resultado.porCam,
@@ -113,6 +117,25 @@ export const compararVersoes = (anterior, atual) => {
 
 // Agrupa uma lista de RMs do diff por CAM e motivo, para o anexo não virar
 // uma coluna de centenas de números soltos.
+// Ordem de liberação da RM no WMS, mais antiga primeiro. Sem data vai
+// para o fim: não dá para afirmar que é antiga.
+// Nome de arquivo a partir do rótulo da versão. Sem acento e sem
+// ordinal, para o PDF e a planilha saírem com o mesmo sufixo — é por
+// ele que se reconhece o par assinatura/manuseio na pasta.
+export const sufixoDeArquivo = (versao) => String(versao || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[ºª°]/g, '')
+  .replace(/[^A-Za-z0-9]+/g, '_')
+  .replace(/^_|_$/g, '');
+
+export const ordemDeLiberacao = (a, b) => {
+  if (a.entrada && b.entrada && a.entrada !== b.entrada) return a.entrada.localeCompare(b.entrada);
+  if (a.entrada && !b.entrada) return -1;
+  if (!a.entrada && b.entrada) return 1;
+  return String(a.rm).localeCompare(String(b.rm));
+};
+
 export const agruparParaAnexo = (itens) => {
   const grupos = new Map();
   itens.forEach(a => {
@@ -122,10 +145,13 @@ export const agruparParaAnexo = (itens) => {
       grupos.set(chave, { cam, origem: a.origem, justificativa: a.justificativa, rms: [], dias: [] });
     }
     const g = grupos.get(chave);
-    g.rms.push(a.rm);
+    g.rms.push({ rm: a.rm, entrada: a.entrada || null });
     if (a.diasEmFila != null) g.dias.push(a.diasEmFila);
   });
   grupos.forEach(g => {
+    // Ordem de liberação, mais antiga em cima: é como o WMS lista as
+    // RMs e como a reserva é manuseada lá.
+    g.rms.sort(ordemDeLiberacao);
     if (!ehFila(g.origem) || !g.dias.length) return;
     const min = Math.min(...g.dias);
     const max = Math.max(...g.dias);

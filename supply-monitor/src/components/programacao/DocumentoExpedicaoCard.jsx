@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { FileDown, Loader2, AlertCircle } from 'lucide-react';
+import { FileDown, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import InfoButton from '../InfoButton';
 import { gerarPdfExpedicao } from '../../utils/programacao/documentoExpedicao';
+import { exportarExcelExpedicao } from '../../utils/programacao/planilhaProgramacao';
 import { formatarBr, hojeIso } from '../../utils/programacao/semana';
 
 // Diferente do documento da programação, este não sai de uma versão
@@ -14,6 +15,7 @@ import { formatarBr, hojeIso } from '../../utils/programacao/semana';
 // cinquenta páginas, e nenhum canvas de navegador aguenta isso.
 const DocumentoExpedicaoCard = ({ projecao, semanaRef, programador, encarregado, setEncarregado, versao }) => {
   const [gerando, setGerando] = useState(false);
+  const [gerandoExcel, setGerandoExcel] = useState(false);
   const [erro, setErro] = useState('');
   const emitidoEm = formatarBr(hojeIso());
 
@@ -33,6 +35,21 @@ const DocumentoExpedicaoCard = ({ projecao, semanaRef, programador, encarregado,
     }
   };
 
+  // A planilha é a ordem de serviço em formato de manuseio: a agenda dia
+  // a dia numa aba e uma linha por RM noutra, em ordem de liberação.
+  const gerarExcel = () => {
+    setErro('');
+    setGerandoExcel(true);
+    try {
+      exportarExcelExpedicao({ projecao, semanaRef, versao, emitidoEm });
+    } catch (e) {
+      console.error(e);
+      setErro(`Não foi possível gerar o Excel: ${e?.message || e}`);
+    } finally {
+      setGerandoExcel(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-4">
       <div className="flex items-center gap-2">
@@ -41,7 +58,7 @@ const DocumentoExpedicaoCard = ({ projecao, semanaRef, programador, encarregado,
         {versao && <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">{versao}</span>}
         <InfoButton
           title="O que sai no PDF"
-          description="A prontificação dia a dia, dividida em GTC e STC e em ordem de prioridade, derivada da programação da separação publicada; o fechamento das STC por janela do CDAM; as pendências de retirada que já passaram do prazo; e os CAMs ainda sem rota cadastrada — mais o Anexo A, com a relação das RMs por CAM, e o Anexo B, com os documentos parados esperando o CDAM. O texto do PDF é selecionável: dá para procurar uma RM pelo número."
+          description="É uma ordem de serviço: o que a semana traz, o índice por cliente e, para cada dia, a lista de CAMs com a ação (prontificar, prontificar e entregar, entregar), o documento a lançar, a quantidade de RMs e o prazo de prontificação. As RMs em si ficam no Anexo A, em ordem de data de liberação. Trabalha só com as RMs da programação da separação publicada. O PDF é o arquivo de assinatura; o Excel é para manusear as RMs no WMS. O texto do PDF é selecionável: dá para procurar uma RM pelo número."
         />
       </div>
 
@@ -63,14 +80,24 @@ const DocumentoExpedicaoCard = ({ projecao, semanaRef, programador, encarregado,
             : 'Semana ainda não publicada'}
           {' '}· emitido em {emitidoEm}
         </p>
-        <button
-          onClick={gerar}
-          disabled={gerando}
-          className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-40 transition-all active:scale-95"
-        >
-          {gerando ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
-          {gerando ? 'Gerando PDF...' : 'Baixar documento'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={gerarExcel}
+            disabled={gerandoExcel}
+            className="px-4 py-2 rounded-xl bg-white border border-emerald-200 text-emerald-700 font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-emerald-50 disabled:opacity-40 transition-all active:scale-95"
+          >
+            {gerandoExcel ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+            {gerandoExcel ? 'Gerando...' : 'Baixar Excel'}
+          </button>
+          <button
+            onClick={gerar}
+            disabled={gerando}
+            className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-40 transition-all active:scale-95"
+          >
+            {gerando ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            {gerando ? 'Gerando PDF...' : 'Baixar PDF'}
+          </button>
+        </div>
       </div>
 
       {!projecao?.temPlano && (
