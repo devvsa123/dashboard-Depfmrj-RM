@@ -92,7 +92,11 @@ export const gerarPdfExpedicao = ({ projecao, semanaRef, programador, encarregad
       if (saida && (!l.saiEm || saida < l.saiEm)) l.saiEm = saida;
     });
 
-    const colunas = [
+    // A última coluna muda de nome conforme o bloco, porque a data
+    // significa coisas diferentes: na GTC é o dia em que o caminhão
+    // passa; na STC é o fim da janela do CDAM — o prazo para a STC ser
+    // aprovada. Quando ela sai do pátio depois disso, não sabemos.
+    const colunas = (rotuloDaSaida) => [
       { key: 'cam', label: 'CAM', largura: 0.26, forte: true },
       { key: 'doc', label: 'Doc.', largura: 0.055, align: 'center' },
       ...dias.map(d => ({ key: d, label: formatarCurto(d), largura: 0.064, align: 'center' })),
@@ -100,7 +104,7 @@ export const gerarPdfExpedicao = ({ projecao, semanaRef, programador, encarregad
       // Largura suficiente para a data inteira: 0,6 x 8pt x 10 caracteres
       // mais a folga da célula, senão o html quebra "29/10/202 / 6".
       { key: 'prazo', label: 'Prontificar até', largura: 0.155, align: 'center' },
-      { key: 'saida', label: 'Sai em', largura: 0.155, align: 'right' }
+      { key: 'saida', label: rotuloDaSaida, largura: 0.155, align: 'right' }
     ];
     const linhasDe = (lista) => lista.map(l => ({
       cam: l.sigla && l.sigla !== l.cam ? `${l.sigla} — ${l.cam}` : l.cam,
@@ -108,7 +112,13 @@ export const gerarPdfExpedicao = ({ projecao, semanaRef, programador, encarregad
       ...Object.fromEntries(dias.map(d => [d, l.porDia[d] || '—'])),
       total: l.total,
       prazo: l.prazo ? formatarBr(l.prazo) : '—',
-      saida: l.saiEm ? formatarBr(l.saiEm) : '—'
+      saida: l.saiEm ? formatarBr(l.saiEm) : '—',
+      // Quando a saída cai ANTES do prazo de prontificação, as duas
+      // datas se contradizem: a janela do CDAM fecha antes de o prazo
+      // da Expedição vencer. Não é erro de conta — é a janela sendo
+      // curta —, mas quem lê precisa ver que ali a data que manda é a
+      // da direita, não a da esquerda.
+      saida_cor: l.saiEm && l.prazo && l.saiEm < l.prazo ? AMBAR : undefined
     }));
     const montaLinhas = (tratamento) => Array.from(porCamGrade.values())
       .filter(l => (tratamento === 'OUTROS'
@@ -117,16 +127,18 @@ export const gerarPdfExpedicao = ({ projecao, semanaRef, programador, encarregad
       .sort((a, b) => b.total - a.total);
 
     p.secao(num(), 'Grade da Semana por CAM');
-    p.paragrafo('Quanto material de cada cliente chega à Expedição em cada dia, qual documento precisa ser lançado, '
-      + 'até quando, e quando sai. As colunas de dia são a CHEGADA na Expedição — um dia útil depois de a estocagem '
-      + 'concluir.');
+    p.paragrafo('Quanto material de cada cliente chega à Expedição em cada dia, qual documento precisa ser lançado e '
+      + 'até quando. As colunas de dia são a CHEGADA na Expedição — um dia útil depois de a estocagem concluir. Na GTC '
+      + 'a última coluna é o dia da rota, quando o material sai. Na STC é o fim da janela do CDAM, prazo para a STC ser '
+      + 'aprovada: quando o CDAM vem buscar depois disso não está no nosso controle. Data em âmbar na última coluna '
+      + 'significa janela fechando antes do prazo de prontificação — ali manda a janela, não o prazo.');
     [
-      { titulo: 'GTC — entrega nossa', linhas: montaLinhas(TRATAMENTOS.GTC) },
-      { titulo: 'STC — lançar e o CDAM retira', linhas: montaLinhas(TRATAMENTOS.STC) },
-      { titulo: 'Sem rota cadastrada', linhas: montaLinhas('OUTROS') }
+      { titulo: 'GTC — entrega nossa', saida: 'Sai em', linhas: montaLinhas(TRATAMENTOS.GTC) },
+      { titulo: 'STC — lançar e o CDAM retira', saida: 'Aprovar STC até', linhas: montaLinhas(TRATAMENTOS.STC) },
+      { titulo: 'Sem rota cadastrada', saida: 'Sai em', linhas: montaLinhas('OUTROS') }
     ].filter(b => b.linhas.length > 0).forEach(b => p.tabela({
       titulo: b.titulo,
-      colunas,
+      colunas: colunas(b.saida),
       linhas: linhasDe(b.linhas),
       rodape: {
         cam: 'TOTAL', doc: '',
