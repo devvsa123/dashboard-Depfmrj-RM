@@ -76,7 +76,7 @@ const DocumentoExpedicaoCard = ({ projecao, semanaRef, programador, encarregado,
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-[11px] text-slate-400 font-medium">
           {projecao?.temPlano
-            ? `${projecao.resumo.total} RM(s) programadas — ${projecao.resumo.aProntificar + projecao.resumo.naSeparacao} a prontificar, ${projecao.resumo.aEntregar} a expedir`
+            ? `${projecao.resumo.total} RM(s) · ${projecao.resumo.cams} cliente(s) · ${projecao.resumo.gtc} a lançar GTC, ${projecao.resumo.stc} a lançar STC`
             : 'Semana ainda não publicada'}
           {' '}· emitido em {emitidoEm}
         </p>

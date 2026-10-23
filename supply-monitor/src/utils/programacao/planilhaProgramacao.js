@@ -186,8 +186,7 @@ export const exportarExcelExpedicao = ({ projecao, semanaRef, versao, emitidoEm 
     { Campo: 'Clientes', Valor: resumo.cams },
     { Campo: 'A lançar GTC', Valor: resumo.gtc },
     { Campo: 'A lançar STC', Valor: resumo.stc },
-    { Campo: 'Entregas na semana', Valor: resumo.entregas },
-    { Campo: 'Canceladas', Valor: resumo.canceladas }
+    { Campo: 'Entregas na semana', Valor: resumo.entregas }
   ];
 
   const linhaDeAgenda = (dia, b) => ({

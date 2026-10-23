@@ -75,8 +75,13 @@ export const gerarPdfExpedicao = ({ projecao, semanaRef, programador, encarregad
     + 'prazo da mensagem nas RMs prioritárias. ENTREGAR é outro trabalho, com data própria: o dia da rota do cliente, '
     + 'quando a GTC fecha em EXPEDIDO. A STC lançada está pronta; o que vem depois é a retirada pelo CDAM, dentro da '
     + 'janela dele.'
-    + (resumo.canceladas ? ` ${resumo.canceladas} RM(s) da programação foram canceladas e saíram da conta.` : '')
   );
+  // Nada de estado de pedido aqui, de propósito: na hora em que o
+  // documento é assinado tudo está em processamento, e o que já andou se
+  // vê na aba Andamento, que lê o WMS ao vivo. O documento traz prazo.
+  p.paragrafo('Este documento traz prazos, não andamento: na emissão todas as RMs estão em processamento. '
+    + 'O acompanhamento do que já foi prontificado e entregue fica na aba Andamento, que lê o WMS ao vivo.',
+    { cor: SUAVE, tamanho: 7.5 });
 
   // ── 2. Índice da semana ───────────────────────────────────────────
   if (blocos.length > 0) {
@@ -102,8 +107,8 @@ export const gerarPdfExpedicao = ({ projecao, semanaRef, programador, encarregad
       .sort((a, b) => b.qtd - a.qtd);
 
     p.secao(num(), 'Índice da Semana por Cliente');
-    p.paragrafo('Onde cada cliente está nesta semana, para achar rápido. O detalhe do que fazer em cada dia vem na '
-      + 'seção seguinte.');
+    p.paragrafo('Os prazos de cada cliente nesta semana, para achar rápido: quando o lote chega, até quando '
+      + 'prontificar e quando sai. O detalhe do que fazer em cada dia vem na seção seguinte.');
     [
       { titulo: 'GTC — entrega nossa', linhas: montaLinhas(TRATAMENTOS.GTC), ultima: 'Entregar em' },
       { titulo: 'STC — lançar e o CDAM retira', linhas: montaLinhas(TRATAMENTOS.STC), ultima: 'Aprovar STC até' },
