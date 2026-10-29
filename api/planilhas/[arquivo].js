@@ -17,12 +17,19 @@ const ARQUIVOS = {
   singra: { nome: 'planilha_rms_unificada.csv', tipo: 'text/csv; charset=utf-8' }
 };
 
-const configuracao = () => ({
-  repo: process.env.GITHUB_STORAGE_REPO,
-  token: process.env.GITHUB_STORAGE_TOKEN,
-  branch: process.env.GITHUB_STORAGE_BRANCH || 'main',
-  api: process.env.GITHUB_API_URL || 'https://api.github.com'
-});
+// Aceita também os nomes GITHUB_OWNER + GITHUB_REPO e GITHUB_TOKEN, e o
+// endereço completo do repositório (https://github.com/dono/repositorio).
+const configuracao = () => {
+  const e = process.env;
+  const bruto = e.GITHUB_STORAGE_REPO ||
+    (e.GITHUB_REPO?.includes('/') ? e.GITHUB_REPO : (e.GITHUB_OWNER && e.GITHUB_REPO ? `${e.GITHUB_OWNER}/${e.GITHUB_REPO}` : ''));
+  return {
+    repo: bruto.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/+$/, ''),
+    token: (e.GITHUB_STORAGE_TOKEN || e.GITHUB_TOKEN || '').trim(),
+    branch: e.GITHUB_STORAGE_BRANCH || e.GITHUB_BRANCH || 'main',
+    api: e.GITHUB_API_URL || 'https://api.github.com'
+  };
+};
 
 const doGithub = (caminho) => {
   const { repo, token, branch, api } = configuracao();
