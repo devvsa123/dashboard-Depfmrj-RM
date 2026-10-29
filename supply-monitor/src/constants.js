@@ -1,6 +1,8 @@
 export const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-export const WMS_URL = "https://spxj2yln4kauap03.public.blob.vercel-storage.com/planilha_estoque.xls";
-export const SINGRA_URL = "https://spxj2yln4kauap03.public.blob.vercel-storage.com/planilha_rms_unificada.csv";
+// As planilhas ficam no repositório privado do GitHub; quem as busca é a
+// função do servidor em api/planilhas/[arquivo].js (o token não vem ao navegador).
+export const WMS_URL = "/api/planilhas/wms";
+export const SINGRA_URL = "/api/planilhas/singra";
 
 // --- MAPEAMENTO PADRÃO DE CORES POR STATUS ---
 export const STATUS_COLOR_MAP = {
