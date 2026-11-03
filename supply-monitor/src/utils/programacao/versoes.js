@@ -53,6 +53,10 @@ export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
   // mostrar, meses depois, quais grades de fornecimento foram
   // consideradas e quais não couberam.
   gradesConsideradas: resultado.gradesConsideradas || [],
+  // Os blocos de marcação no WMS: um por CAM por dia, com até onde
+  // marcar na tela. É instrução de trabalho, então vai no snapshot —
+  // o documento assinado precisa poder ser refeito igual.
+  blocos: resultado.blocos || [],
   resumo: resultado.resumo,
   alertas: resultado.alertas,
   bloqueios: bloqueios.map(b => ({ ...b })),

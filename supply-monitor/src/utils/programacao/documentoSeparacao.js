@@ -90,7 +90,53 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
     }
   });
 
-  // ── 3. Grades de fornecimento ─────────────────────────────────────
+  // ── 3. Os blocos de marcação no WMS ───────────────────────────────
+  //
+  // É a seção que o operador leva para a tela. Cada linha é uma capa de
+  // lote: o cliente, quantas RMs e ATÉ ONDE marcar. A tela lista as RMs
+  // em aberto do cliente por antiguidade e a programação as toma na
+  // mesma ordem, então marcar é ir da primeira linha até o corte — sem
+  // conferir RM a RM, que é o que custava o dia do operador.
+  const blocos = snapshot.blocos || [];
+  if (blocos.length > 0) {
+    p.secao(num(), 'Montagem da Fila no WMS');
+    p.paragrafo('Uma linha por capa de lote. Filtre o cliente na AK050 e marque como diz a coluna "O que marcar": '
+      + '"tudo" quando o bloco é tudo o que o cliente tem em aberto, ou "até a RM X" quando a semana leva só a parte '
+      + 'mais antiga — a tela ordena por antiguidade, então é da primeira linha até essa RM, sem pular nenhuma. '
+      + 'Bloco com exceção é o único que pede conferência, e as RMs a NÃO marcar vêm escritas.');
+    p.tabela({
+      colunas: [
+        { key: 'dia', label: 'Dia', largura: 0.13 },
+        { key: 'ordem', label: 'Bloco', largura: 0.07, align: 'center' },
+        { key: 'cam', label: 'CAM', largura: 0.3, forte: true },
+        { key: 'qtd', label: 'RMs', largura: 0.09, align: 'center', forte: true },
+        { key: 'marcar', label: 'O que marcar na tela', largura: 0.41 }
+      ],
+      linhas: blocos.map(b => ({
+        dia: formatarCurto(b.dia),
+        ordem: b.ordem,
+        cam: b.cam,
+        qtd: b.qtd,
+        marcar: b.cobertura === 'TOTAL'
+          ? `Tudo o que o CAM tem em aberto (${b.pendentesDoCam})`
+          : b.cobertura === 'ATE_O_CORTE'
+            ? `Da mais antiga até a RM ${b.corte?.rm} (liberada em ${formatarBr(b.corte?.entrada)})`
+            : `Até a RM ${b.corte?.rm}, EXCETO ${b.faltando.length} RM(s): ${b.faltando.slice(0, 6).join(', ')}${b.faltando.length > 6 ? '...' : ''}`,
+        marcar_cor: b.cobertura === 'COM_EXCECOES' ? AMBAR : undefined
+      }))
+    });
+    const comExcecao = blocos.filter(b => b.cobertura === 'COM_EXCECOES');
+    const empates = blocos.filter(b => b.cobertura === 'ATE_O_CORTE' && b.empateNoCorte > 1);
+    if (comExcecao.length === 0) {
+      p.texto(`Nenhum dos ${blocos.length} blocos exige conferência RM a RM.`, { tamanho: 7.5, cor: SUAVE, espacoDepois: 2 });
+    }
+    if (empates.length > 0) {
+      p.texto(`Em ${empates.length} bloco(s) o corte cai numa data com mais de uma RM do mesmo CAM; se a tela não `
+        + 'ordenar por número dentro da mesma data, confira só essas linhas.', { tamanho: 7.5, cor: SUAVE, espacoDepois: 2 });
+    }
+  }
+
+  // ── 4. Grades de fornecimento ─────────────────────────────────────
   if (grades.length > 0) {
     p.secao(num(), 'Grades de Fornecimento Consideradas');
     p.paragrafo('Para cada CAM da semana: a grade dele — dia de rota, no caso de entrega nossa, ou janela do CDAM, no '

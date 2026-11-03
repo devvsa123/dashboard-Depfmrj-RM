@@ -102,7 +102,10 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
     // montagem da capa de lote: um cliente, um bloco.
     { Campo: 'Agrupamento', Valor: 'Um CAM por dia — reserve o cliente inteiro de uma vez' },
     { Campo: 'RMs fora da semana por falta de espaço no dia do CAM', Valor: resumo.sobraPorAgrupamento ?? 0 },
-    { Campo: 'CAMs maiores que um dia (divididos)', Valor: resumo.camsDivididos ?? 0 }
+    { Campo: 'CAMs maiores que um dia (divididos)', Valor: resumo.camsDivididos ?? 0 },
+    { Campo: 'CAMs adiados inteiros (não cabiam em nenhum dia)', Valor: resumo.camsAdiadosInteiros ?? 0 },
+    { Campo: 'Blocos a montar no WMS', Valor: resumo.blocosTotais ?? 0 },
+    { Campo: 'Blocos que exigem conferência RM a RM', Valor: resumo.blocosComExcecao ?? 0 }
   ];
 
   // Uma linha por RM: a aba que se usa para trabalhar. Na ordem do
@@ -151,8 +154,26 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
     Total: l.total
   }));
 
+  // A aba que vai para a tela do WMS: uma linha por capa de lote.
+  const blocosLinhas = (snapshot.blocos || []).map(b => ({
+    Dia: formatarBr(b.dia),
+    Bloco: b.ordem,
+    CAM: b.cam,
+    RMs: b.qtd,
+    'Em aberto no CAM': b.pendentesDoCam,
+    'O que marcar na tela': b.cobertura === 'TOTAL'
+      ? 'Tudo o que o CAM tem em aberto'
+      : b.cobertura === 'ATE_O_CORTE'
+        ? `Da mais antiga até a RM ${b.corte?.rm}`
+        : `Até a RM ${b.corte?.rm}, exceto as listadas ao lado`,
+    'RM do corte': b.corte?.rm || '',
+    'Liberação do corte': data(b.corte?.entrada),
+    'NÃO marcar': (b.faltando || []).join(' ')
+  }));
+
   montarLivro([
     { nome: 'Resumo', linhas: resumoLinhas },
+    { nome: 'Montagem no WMS', linhas: blocosLinhas },
     { nome: 'RMs', linhas: rms },
     ...abasPorDia,
     { nome: 'Grade por CAM', linhas: gradePorCam },

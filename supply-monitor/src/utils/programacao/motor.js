@@ -63,20 +63,26 @@ export const programarSemana = ({
   const jaAlocadas = new Set();
   const naoAlocadas = [];
 
-  // ── Agrupamento por CAM: um CAM ocupa UM dia da semana ────────────
+  // ── Agrupamento por CAM: um CAM ocupa UM dia, e vai inteiro ───────
   //
   // Regra dura, e por um motivo operacional, não teórico. Para pôr a
   // fila no WMS, o operador monta a capa de lote na tela AK050 marcando
-  // pedido por pedido, e depois reserva a capa na AK300. A fila não se
-  // corrige depois: para mudar qualquer coisa é preciso cancelar as
-  // reservas e refazer tudo na ordem em que elas aparecem. Com o CAM
-  // inteiro num dia só, cada cliente vira uma capa de lote montada de
-  // uma vez — é a diferença entre caçar RMs soltas na tela e marcar um
-  // bloco contíguo.
+  // pedido por pedido, e depois reserva a capa na AK300. Filtrar o
+  // cliente ele já sabe fazer; o que custa o dia dele é conferir, linha
+  // por linha, quais daquelas RMs estão na programação — a tela lista
+  // tudo o que o CAM tem em aberto, por antiguidade.
   //
-  // O preço vem junto e sai escrito: o que não couber no dia do CAM não
-  // escorre para outro dia, fica para a semana seguinte. Quem quiser
-  // levar o CAM inteiro aumenta a capacidade daquele dia.
+  // Por isso não basta juntar o CAM num dia: o CAM entra INTEIRO ou não
+  // entra. Com o bloco igual a tudo o que o cliente tem na fila, a
+  // marcação deixa de ter conferência: filtra o CAM e marca tudo.
+  //
+  // Duas exceções, ambas declaradas no documento:
+  //   - CAM maior do que um dia inteiro, que nenhum dia comporta: vai
+  //     dividido, da RM mais antiga para a mais nova, e o documento diz
+  //     até que RM marcar (a tela também ordena por antiguidade).
+  //   - CAM preso a um dia por demanda com prazo ou por ordem do
+  //     programador, cujo dia encheu: o que sobrou fica de fora e sai
+  //     nomeado, para o operador saber o que NÃO marcar.
   const diaDoCam = new Map();
   const chaveDoCam = (cam) => (cam && String(cam).trim() ? String(cam).trim() : null);
   const sobraPorCam = new Map();
@@ -102,20 +108,39 @@ export const programarSemana = ({
     return true;
   };
 
-  // O dia de um bloco: o mais cedo em que ele caiba INTEIRO. Se não
-  // couber em nenhum, o de maior sobra — leva o máximo possível de uma
-  // vez, e o resto fica registrado.
-  const diaParaBloco = (qtd, limite) => {
+  // O dia de um bloco: o mais cedo em que ele caiba INTEIRO, primeiro
+  // dentro do limite de rota, depois em qualquer dia. Sem dia que o
+  // comporte inteiro, devolve null — e o CAM fica para a semana
+  // seguinte em vez de entrar pela metade.
+  const diaQueCabeInteiro = (qtd, limite) => {
+    const cabe = (g) => !g.bloqueio && g.restante >= qtd;
+    const dentroDoLimite = limite ? grade.find(g => cabe(g) && g.dia <= limite) : null;
+    return (dentroDoLimite || grade.find(cabe) || null)?.dia || null;
+  };
+
+  // Para os caminhos que não podem esperar (demanda com prazo, CAM
+  // forçado): o dia com mais espaço, mesmo que não caiba tudo.
+  const diaComMaisEspaco = (limite) => {
     const elegiveis = grade.filter(g => !g.bloqueio && g.restante > 0 && (!limite || g.dia <= limite));
-    if (!elegiveis.length) return null;
-    const inteiro = elegiveis.find(g => g.restante >= qtd);
-    if (inteiro) return inteiro.dia;
-    return elegiveis.reduce((a, b) => (b.restante > a.restante ? b : a)).dia;
+    const livres = elegiveis.length ? elegiveis : grade.filter(g => !g.bloqueio && g.restante > 0);
+    if (!livres.length) return null;
+    return livres.reduce((a, b) => (b.restante > a.restante ? b : a)).dia;
   };
 
   // Agrupa por CAM preservando a ordem de chegada: o bloco do primeiro
   // CAM da lista continua sendo o primeiro a ser atendido. RM sem CAM
   // não agrupa com ninguém — não é cliente, é linha solta.
+  // Dentro do bloco, a ordem é a da tela do WMS: data de liberação e,
+  // no empate, número da RM. É o que garante que o pedaço levado nesta
+  // semana seja sempre o COMEÇO da lista do cliente — marcar vira "da
+  // primeira linha até a RM X", em vez de conferir linha por linha.
+  const ordemDaTela = (a, b) => {
+    if (a.entrada && b.entrada && a.entrada !== b.entrada) return a.entrada.localeCompare(b.entrada);
+    if (a.entrada && !b.entrada) return -1;
+    if (!a.entrada && b.entrada) return 1;
+    return String(a.rm).localeCompare(String(b.rm));
+  };
+
   const blocosPorCam = (itens) => {
     const mapa = new Map();
     itens.forEach(item => {
@@ -124,14 +149,21 @@ export const programarSemana = ({
       if (!mapa.has(chave)) mapa.set(chave, { cam, itens: [] });
       mapa.get(chave).itens.push(item);
     });
-    return Array.from(mapa.values());
+    const blocos = Array.from(mapa.values());
+    blocos.forEach(b => b.itens.sort(ordemDaTela));
+    return blocos;
   };
 
-  const alocarBloco = ({ cam, itens, limite = null, registroDe, contarSobra = true }) => {
+  const alocarBloco = ({ cam, itens, limite = null, registroDe, contarSobra = true, exigeDia = true }) => {
     if (!itens.length) return { dia: null, alocadas: [], sobra: [] };
     // Se o CAM já tem dia nesta semana, é nele — mesmo que outro dia
     // coubesse melhor. É isso que garante uma capa de lote por cliente.
-    const dia = (cam && diaDoCam.get(cam)) || diaParaBloco(itens.length, limite) || diaParaBloco(itens.length, null);
+    // CAM maior que um dia inteiro não tem como entrar inteiro em dia
+    // nenhum: para ele, dividir é o caminho, não a metade de um bloco.
+    const podeDividir = Boolean(cam) && itens.length > maiorDia;
+    const dia = (cam && diaDoCam.get(cam))
+      || diaQueCabeInteiro(itens.length, limite)
+      || ((exigeDia || podeDividir) ? diaComMaisEspaco(limite) : null);
     if (!dia) return { dia: null, alocadas: [], sobra: [...itens] };
 
     const alocadas = [];
@@ -316,7 +348,16 @@ export const programarSemana = ({
   comUrgencia.sort((a, b) => porUrgencia(a.urgencia, b.urgencia));
 
   const perderamARota = [];
-  blocosPorCam(comUrgencia).forEach(bloco => {
+  // Primeiro os CAMs que já têm dia (demanda com prazo ou ordem do
+  // programador): completar o bloco deles é o que faz a marcação no WMS
+  // virar "filtra o CAM e marca tudo". Depois os demais, por urgência.
+  const blocosDaFila = blocosPorCam(comUrgencia);
+  blocosDaFila.sort((a, b) => {
+    const presoA = a.cam && diaDoCam.has(a.cam) ? 0 : 1;
+    const presoB = b.cam && diaDoCam.has(b.cam) ? 0 : 1;
+    return presoA - presoB;
+  });
+  blocosDaFila.forEach(bloco => {
     // O limite do bloco é o mais apertado entre as RMs dele.
     const limite = bloco.itens.reduce(
       (menor, i) => (i.urgencia.limite && (!menor || i.urgencia.limite < menor) ? i.urgencia.limite : menor),
@@ -338,9 +379,10 @@ export const programarSemana = ({
           }
       )
     });
+    if (!dia) return;
     // Perdeu a rota: entrou na semana, mas depois do dia em que ainda
     // daria para pegar a saída do próprio CAM.
-    if (dia && limite && dia > limite) perderamARota.push(...alocadas.filter(i => i.urgencia.limite));
+    if (limite && dia > limite) perderamARota.push(...alocadas.filter(i => i.urgencia.limite));
   });
 
   // Quem não coube antes do próprio limite não some da semana: é
@@ -396,6 +438,89 @@ export const programarSemana = ({
       texto: `${totalSobra} RM(s) de ${sobras.length} CAM(s) ficaram fora da semana porque o CAM vai inteiro num dia só e o dia dele encheu: ${primeiros}${sobras.length > 3 ? ` e mais ${sobras.length - 3}` : ''}. Para levar o CAM inteiro, aumente a capacidade do dia.`
     });
   }
+
+  // ── Os blocos de marcação no WMS ──────────────────────────────────
+  //
+  // Um bloco por CAM por dia: é o que o operador marca de uma vez na
+  // AK050 para montar a capa de lote. O que cada bloco precisa dizer é
+  // ATÉ ONDE marcar, porque a tela lista as RMs em aberto do cliente
+  // por antiguidade, e a programação também as toma por antiguidade.
+  //
+  //   TOTAL         o bloco é tudo o que o CAM tem na fila: marca tudo.
+  //   ATE_O_CORTE   marca da mais antiga até a RM do corte, sem pular
+  //                 nenhuma — não há conferência, há um limite.
+  //   COM_EXCECOES  há RMs mais antigas que o corte fora do bloco; elas
+  //                 saem nomeadas, e só essas precisam ser desmarcadas.
+  //
+  // COM_EXCECOES é o caso que a regra do agrupamento existe para
+  // evitar; quando aparece, aparece com a lista do que não marcar.
+  const pendentesPorCam = new Map();
+  fila.forEach(item => {
+    const cam = chaveDoCam(item.cam) || '(sem CAM)';
+    if (!pendentesPorCam.has(cam)) pendentesPorCam.set(cam, []);
+    pendentesPorCam.get(cam).push(item);
+  });
+
+  // Em que dia cada RM foi programada: o que já foi reservado num dia
+  // anterior não está mais na tela quando chega o dia seguinte.
+  const diaDaRm = new Map();
+  grade.forEach(slot => slot.alocacoes.forEach(a => diaDaRm.set(a.rm, slot.dia)));
+
+  // Ordem da tela: data de liberação e, no empate, número da RM — a
+  // mesma ordem que o resto do sistema usa para listar.
+  const ateOCorte = (x, corte) => (
+    x.entrada < corte.entrada || (x.entrada === corte.entrada && String(x.rm) <= String(corte.rm))
+  );
+
+  const blocos = [];
+  grade.forEach(slot => {
+    const porCamNoDia = new Map();
+    slot.alocacoes.forEach(a => {
+      const cam = chaveDoCam(a.cam) || '(sem CAM)';
+      if (!porCamNoDia.has(cam)) porCamNoDia.set(cam, []);
+      porCamNoDia.get(cam).push(a);
+    });
+    let ordem = 0;
+    porCamNoDia.forEach((itens, cam) => {
+      const comData = itens.filter(i => i.entrada);
+      // O corte é a última RM do bloco na ordem da tela: marca-se da
+      // primeira linha até ela.
+      const corte = comData.length
+        ? comData.reduce((ultima, i) => (ateOCorte(ultima, i) ? i : ultima))
+        : null;
+      const pendentes = pendentesPorCam.get(cam) || [];
+      const noBloco = new Set(itens.map(i => i.rm));
+      // Some da conta o que já foi reservado num dia anterior desta
+      // mesma semana: no dia do bloco, aquilo não está mais na tela.
+      const aindaNaTela = (x) => {
+        const dia = diaDaRm.get(x.rm);
+        return !(dia && dia < slot.dia);
+      };
+      const faltando = pendentes
+        .filter(x => !noBloco.has(x.rm) && aindaNaTela(x))
+        .filter(x => (corte ? (x.entrada && ateOCorte(x, corte)) : true))
+        .map(x => x.rm);
+      const cobertura = itens.length >= pendentes.filter(aindaNaTela).length
+        ? 'TOTAL'
+        : (faltando.length ? 'COM_EXCECOES' : 'ATE_O_CORTE');
+      // Empate na data do corte: se a tela não ordenar por número da RM
+      // dentro da mesma data, estas linhas precisam de olho.
+      const empateNoCorte = corte
+        ? pendentes.filter(x => x.entrada === corte.entrada && aindaNaTela(x)).length
+        : 0;
+      blocos.push({
+        dia: slot.dia,
+        ordem: ++ordem,
+        cam,
+        qtd: itens.length,
+        pendentesDoCam: pendentes.filter(aindaNaTela).length,
+        cobertura,
+        corte: corte ? { rm: corte.rm, entrada: corte.entrada } : null,
+        empateNoCorte,
+        faltando
+      });
+    });
+  });
 
   // ── A prestação de contas das grades de fornecimento ──────────────
   //
@@ -459,6 +584,8 @@ export const programarSemana = ({
     gradesConsideradas,
     // O custo do agrupamento, CAM por CAM: o que ficou fora da semana
     // porque o dia daquele CAM encheu.
+    // Um por CAM por dia, com a regra de marcação no WMS.
+    blocos,
     sobrasPorAgrupamento: sobras,
     camsDivididos,
     porCam: Array.from(porCam.values()).sort((a, b) => b.total - a.total),
@@ -481,6 +608,8 @@ export const programarSemana = ({
       sobraPorAgrupamento: totalSobra,
       camsComSobra: sobras.length,
       camsDivididos: camsDivididos.length,
+      blocosTotais: blocos.length,
+      blocosComExcecao: blocos.filter(b => b.cobertura === 'COM_EXCECOES').length,
       filaTotal: fila.length,
       reemitidasNaFila: fila.filter(f => f.reemitida).length,
       diasBloqueados: grade.filter(g => g.bloqueio).length,
