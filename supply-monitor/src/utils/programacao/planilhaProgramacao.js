@@ -269,3 +269,67 @@ export const exportarExcelExpedicao = ({ projecao, semanaRef, versao, emitidoEm 
     { nome: 'Por cliente', linhas: indice }
   ], `Programacao_Expedicao_${semanaRef}${sufixo}.xlsx`);
 };
+
+// ── Análise da fila ─────────────────────────────────────────────────
+// Sai do arquivo do PWA, não de versão publicada: é o retrato de agora.
+// A aba "Fila" tem uma linha por RM, mais antiga em cima.
+export const exportarExcelFila = ({ analise, emitidoEm }) => {
+  if (!analise) throw new Error('Sem fila para exportar.');
+
+  const resumoLinhas = [
+    { Campo: 'Emitido em', Valor: emitidoEm },
+    { Campo: 'RMs na fila', Valor: analise.total },
+    { Campo: 'Clientes na fila', Valor: analise.cams },
+    { Campo: 'Idade média (dias)', Valor: analise.mediaDias ?? '' },
+    { Campo: 'Idade mediana (dias)', Valor: analise.medianaDias ?? '' },
+    { Campo: 'Maior espera (dias)', Valor: analise.maisAntiga?.dias ?? '' },
+    { Campo: 'RM mais antiga', Valor: analise.maisAntiga?.rm || '' },
+    { Campo: 'Sem data de liberação', Valor: analise.semData },
+    { Campo: 'Reemitidas na fila', Valor: analise.reemitidas },
+    { Campo: 'Semanas para zerar', Valor: analise.semanasParaZerar ?? '' },
+    { Campo: 'Vazão medida por semana', Valor: analise.capacidadeSemana ?? '' },
+    { Campo: 'RMs no arquivo do PWA', Valor: analise.totalNoArquivo }
+  ];
+
+  montarLivro([
+    { nome: 'Resumo', linhas: resumoLinhas },
+    {
+      nome: 'Fila',
+      linhas: analise.linhas.map(l => ({
+        RM: l.rm,
+        CAM: l.cam,
+        Sigla: l.sigla,
+        Situação: l.status,
+        'Data de liberação': data(l.entrada),
+        'Dias na fila': l.dias ?? '',
+        'Último movimento': data(l.movimento),
+        Tratamento: l.tratamento,
+        'Tipo de RM': l.tipoRm,
+        Documento: l.documento,
+        Reemitida: l.reemitida ? 'sim' : ''
+      }))
+    },
+    {
+      nome: 'Por situação',
+      linhas: analise.porStatus.map(s => ({
+        Situação: s.status, RMs: s.qtd, '% da fila': s.pct,
+        'Idade média (dias)': s.mediaDias ?? '', 'Maior espera (dias)': s.maiorEspera ?? ''
+      }))
+    },
+    {
+      nome: 'Por cliente',
+      linhas: analise.porCliente.map(c => ({
+        CAM: c.cam, Sigla: c.sigla, Tratamento: c.tratamento, RMs: c.qtd, '% da fila': c.pct,
+        'Idade média (dias)': c.mediaDias ?? '', 'Maior espera (dias)': c.maiorEspera ?? ''
+      }))
+    },
+    {
+      nome: 'Idade da fila',
+      linhas: analise.faixas.map(f => ({ Faixa: f.label, RMs: f.qtd, '% da fila': f.pct }))
+    },
+    {
+      nome: 'Fora da fila',
+      linhas: analise.foraDaFila.map(f => ({ Situação: f.status, RMs: f.qtd, 'Por que não entra': f.motivo }))
+    }
+  ], `Analise_da_Fila_${analise.hoje}.xlsx`);
+};

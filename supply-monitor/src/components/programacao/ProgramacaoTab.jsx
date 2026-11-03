@@ -9,6 +9,7 @@ import AcompanhamentoPanel from './AcompanhamentoPanel';
 import ConfigCamPanel from './ConfigCamPanel';
 import ForcarCamPanel from './ForcarCamPanel';
 import ExpedicaoPanel from './ExpedicaoPanel';
+import FilaPanel from './FilaPanel';
 import DocumentoExpedicaoCard from './DocumentoExpedicaoCard';
 import GradesPanel from './GradesPanel';
 import VersoesPanel from './VersoesPanel';
@@ -64,13 +65,14 @@ const BloqueiosPanel = ({ bloqueios, adicionarBloqueio, removerBloqueio, diasDaS
 // continua sendo dele.
 const SUBABAS = [
   { key: 'montagem', label: 'Montar a semana' },
+  { key: 'fila', label: 'Análise da fila' },
   { key: 'andamento', label: 'Andamento' },
   { key: 'expedicao', label: 'Expedição' },
   { key: 'config', label: 'CAM e Rotas' }
 ];
 
 // Abas que não falam de uma semana específica: olham o estado de agora.
-const SEM_SEMANA = new Set(['config', 'expedicao']);
+const SEM_SEMANA = new Set(['config', 'expedicao', 'fila']);
 
 const ProgramacaoTab = (p) => {
   const [subaba, setSubaba] = useState('montagem');
@@ -158,7 +160,14 @@ const ProgramacaoTab = (p) => {
     </div>
     )}
 
-    {subaba === 'expedicao' ? (
+    {subaba === 'fila' ? (
+      <FilaPanel
+        indiceWms={p.indiceWms}
+        porCam={p.camConfig.porCam}
+        capacidadeMedida={p.capacidadeMedida}
+        ultimaSync={p.ultimaSync}
+      />
+    ) : subaba === 'expedicao' ? (
       <ExpedicaoPanel
         filas={filasExpedicao}
         projecao={projecaoExpedicao}
