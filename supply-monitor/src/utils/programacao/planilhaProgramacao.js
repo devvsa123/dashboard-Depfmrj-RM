@@ -97,7 +97,12 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
     { Campo: 'Por antiguidade', Valor: resumo.porAntiguidade },
     { Campo: 'Forçadas', Valor: resumo.forcadas ?? 0 },
     { Campo: 'CAMs atendidos', Valor: resumo.camsAtendidos },
-    { Campo: 'Fila de separação', Valor: resumo.filaTotal }
+    { Campo: 'Fila de separação', Valor: resumo.filaTotal },
+    // O agrupamento é o que torna a aba de cada dia utilizável na
+    // montagem da capa de lote: um cliente, um bloco.
+    { Campo: 'Agrupamento', Valor: 'Um CAM por dia — reserve o cliente inteiro de uma vez' },
+    { Campo: 'RMs fora da semana por falta de espaço no dia do CAM', Valor: resumo.sobraPorAgrupamento ?? 0 },
+    { Campo: 'CAMs maiores que um dia (divididos)', Valor: resumo.camsDivididos ?? 0 }
   ];
 
   // Uma linha por RM: a aba que se usa para trabalhar. Na ordem do
@@ -123,10 +128,22 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
   }));
 
   // E uma aba por dia, para quem trabalha aquele dia abrir a própria.
-  const abasPorDia = grade.map(slot => ({
-    nome: abaDoDia(slot.dia),
-    linhas: alocadas.filter(a => a.dia === slot.dia).map(linhaDeRm)
-  }));
+  //
+  // A coluna BLOCO é a ordem de montagem no WMS: cada bloco é um CAM,
+  // que vira uma capa de lote montada de uma vez na AK050. Monte o
+  // bloco 1, reserve, depois o 2 — sem caçar RM solta na tela.
+  const abasPorDia = grade.map(slot => {
+    const doDia = alocadas.filter(a => a.dia === slot.dia);
+    const blocos = new Map();
+    doDia.forEach(a => {
+      const cam = a.cam || '(sem CAM)';
+      if (!blocos.has(cam)) blocos.set(cam, blocos.size + 1);
+    });
+    return {
+      nome: abaDoDia(slot.dia),
+      linhas: doDia.map(a => ({ Bloco: blocos.get(a.cam || '(sem CAM)'), ...linhaDeRm(a) }))
+    };
+  });
 
   const gradePorCam = porCam.map(l => ({
     CAM: l.cam,

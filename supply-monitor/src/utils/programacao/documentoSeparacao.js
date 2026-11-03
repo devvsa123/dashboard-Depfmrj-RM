@@ -66,6 +66,12 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
 
   // ── 2. Grade por CAM ──────────────────────────────────────────────
   p.secao(num(), 'Grade de Atendimento por CAM');
+  // A regra do agrupamento precisa estar no papel: é ela que explica
+  // por que um CAM aparece num dia só, e é dela que depende a montagem
+  // da capa de lote no WMS.
+  p.paragrafo('Cada CAM é atendido num único dia da semana, para que a reserva no WMS seja montada de uma vez: '
+    + 'um cliente, uma capa de lote. Um CAM só aparece em mais de um dia quando tem mais RMs do que cabe num dia '
+    + 'inteiro — nesse caso a divisão vem avisada nas observações.');
   p.tabela({
     colunas: [
       { key: 'cam', label: 'CAM', largura: 0.34, forte: true },
