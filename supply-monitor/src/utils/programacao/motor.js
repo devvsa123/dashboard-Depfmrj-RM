@@ -446,14 +446,19 @@ export const programarSemana = ({
   // ATÉ ONDE marcar, porque a tela lista as RMs em aberto do cliente
   // por antiguidade, e a programação também as toma por antiguidade.
   //
-  //   TOTAL         o bloco é tudo o que o CAM tem na fila: marca tudo.
-  //   ATE_O_CORTE   marca da mais antiga até a RM do corte, sem pular
-  //                 nenhuma — não há conferência, há um limite.
-  //   COM_EXCECOES  há RMs mais antigas que o corte fora do bloco; elas
-  //                 saem nomeadas, e só essas precisam ser desmarcadas.
+  //   TOTAL               o bloco é tudo o que o CAM tem em aberto:
+  //                       marca tudo.
+  //   ATE_O_CORTE         marca da primeira linha até a RM do corte,
+  //                       sem pular nenhuma.
+  //   CORTE_MAIS_AVULSAS  marca até o corte e soma as RMs nomeadas —
+  //                       são as que uma mensagem com prazo pediu fora
+  //                       da ordem da fila.
+  //   SOMENTE_AVULSAS     só RMs nomeadas, sem trecho contíguo.
   //
-  // COM_EXCECOES é o caso que a regra do agrupamento existe para
-  // evitar; quando aparece, aparece com a lista do que não marcar.
+  // Nunca se pede para DESMARCAR: dizer "marque até X exceto 75" seria
+  // devolver a conferência linha a linha que esta regra existe para
+  // eliminar. O que está fora do trecho contíguo é marcado à parte, e
+  // o documento lista essas RMs uma a uma.
   const pendentesPorCam = new Map();
   fila.forEach(item => {
     const cam = chaveDoCam(item.cam) || '(sem CAM)';
@@ -468,10 +473,6 @@ export const programarSemana = ({
 
   // Ordem da tela: data de liberação e, no empate, número da RM — a
   // mesma ordem que o resto do sistema usa para listar.
-  const ateOCorte = (x, corte) => (
-    x.entrada < corte.entrada || (x.entrada === corte.entrada && String(x.rm) <= String(corte.rm))
-  );
-
   const blocos = [];
   grade.forEach(slot => {
     const porCamNoDia = new Map();
@@ -482,42 +483,48 @@ export const programarSemana = ({
     });
     let ordem = 0;
     porCamNoDia.forEach((itens, cam) => {
-      const comData = itens.filter(i => i.entrada);
-      // O corte é a última RM do bloco na ordem da tela: marca-se da
-      // primeira linha até ela.
-      const corte = comData.length
-        ? comData.reduce((ultima, i) => (ateOCorte(ultima, i) ? i : ultima))
-        : null;
-      const pendentes = pendentesPorCam.get(cam) || [];
       const noBloco = new Set(itens.map(i => i.rm));
-      // Some da conta o que já foi reservado num dia anterior desta
-      // mesma semana: no dia do bloco, aquilo não está mais na tela.
-      const aindaNaTela = (x) => {
-        const dia = diaDaRm.get(x.rm);
-        return !(dia && dia < slot.dia);
-      };
-      const faltando = pendentes
-        .filter(x => !noBloco.has(x.rm) && aindaNaTela(x))
-        .filter(x => (corte ? (x.entrada && ateOCorte(x, corte)) : true))
-        .map(x => x.rm);
-      const cobertura = itens.length >= pendentes.filter(aindaNaTela).length
+      // O que o operador vê na tela naquele dia: o que o CAM tem em
+      // aberto menos o que já foi reservado num dia anterior da semana.
+      const naTela = (pendentesPorCam.get(cam) || [])
+        .filter(x => { const d = diaDaRm.get(x.rm); return !(d && d < slot.dia); })
+        .sort(ordemDaTela);
+
+      // O maior trecho CONTÍGUO a partir da primeira linha. É o que se
+      // marca sem conferir nada: da primeira até o corte.
+      let k = 0;
+      while (k < naTela.length && noBloco.has(naTela[k].rm)) k++;
+      const prefixo = naTela.slice(0, k);
+      const corte = prefixo.length ? prefixo[prefixo.length - 1] : null;
+      // O que está no bloco e fora do trecho contíguo: RMs nomeadas por
+      // uma demanda com prazo, que a tela mostra espalhadas. Elas são
+      // MARCADAS À PARTE — dizer "marque até X exceto 75" seria pior do
+      // que dizer "marque até X e some estas 4".
+      const avulsas = itens
+        .filter(i => !prefixo.some(x => x.rm === i.rm))
+        .sort(ordemDaTela)
+        .map(i => i.rm);
+
+      const cobertura = itens.length >= naTela.length
         ? 'TOTAL'
-        : (faltando.length ? 'COM_EXCECOES' : 'ATE_O_CORTE');
-      // Empate na data do corte: se a tela não ordenar por número da RM
-      // dentro da mesma data, estas linhas precisam de olho.
-      const empateNoCorte = corte
-        ? pendentes.filter(x => x.entrada === corte.entrada && aindaNaTela(x)).length
-        : 0;
+        : avulsas.length === 0 ? 'ATE_O_CORTE' : (prefixo.length ? 'CORTE_MAIS_AVULSAS' : 'SOMENTE_AVULSAS');
+
+      // Empate na data do corte: se a tela não ordenar por número dentro
+      // da mesma data, só essas linhas precisam de olho.
+      const empateNoCorte = corte ? naTela.filter(x => x.entrada === corte.entrada).length : 0;
+
       blocos.push({
         dia: slot.dia,
         ordem: ++ordem,
         cam,
         qtd: itens.length,
-        pendentesDoCam: pendentes.filter(aindaNaTela).length,
+        comPrazo: itens.filter(i => i.prazo).length,
+        pendentesDoCam: naTela.length,
         cobertura,
         corte: corte ? { rm: corte.rm, entrada: corte.entrada } : null,
-        empateNoCorte,
-        faltando
+        ateOCorte: prefixo.length,
+        avulsas,
+        empateNoCorte
       });
     });
   });
@@ -609,7 +616,8 @@ export const programarSemana = ({
       camsComSobra: sobras.length,
       camsDivididos: camsDivididos.length,
       blocosTotais: blocos.length,
-      blocosComExcecao: blocos.filter(b => b.cobertura === 'COM_EXCECOES').length,
+      blocosComAvulsas: blocos.filter(b => b.avulsas.length > 0).length,
+      rmsAvulsasNaMarcacao: blocos.reduce((t, b) => t + b.avulsas.length, 0),
       filaTotal: fila.length,
       reemitidasNaFila: fila.filter(f => f.reemitida).length,
       diasBloqueados: grade.filter(g => g.bloqueio).length,

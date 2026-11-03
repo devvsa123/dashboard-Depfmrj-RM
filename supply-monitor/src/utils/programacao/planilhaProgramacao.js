@@ -105,7 +105,8 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
     { Campo: 'CAMs maiores que um dia (divididos)', Valor: resumo.camsDivididos ?? 0 },
     { Campo: 'CAMs adiados inteiros (não cabiam em nenhum dia)', Valor: resumo.camsAdiadosInteiros ?? 0 },
     { Campo: 'Blocos a montar no WMS', Valor: resumo.blocosTotais ?? 0 },
-    { Campo: 'Blocos que exigem conferência RM a RM', Valor: resumo.blocosComExcecao ?? 0 }
+    { Campo: 'Blocos com RMs avulsas a marcar', Valor: resumo.blocosComAvulsas ?? 0 },
+    { Campo: 'RMs avulsas na marcação', Valor: resumo.rmsAvulsasNaMarcacao ?? 0 }
   ];
 
   // Uma linha por RM: a aba que se usa para trabalhar. Na ordem do
@@ -118,6 +119,9 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
   const linhaDeRm = (a) => ({
     RM: a.rm,
     CAM: a.cam || '',
+    // Primeira coluna de filtro do operador: o que é compromisso de
+    // prazo e o que é fila.
+    Prioridade: a.prazo ? 'PRAZO' : '',
     'Data de liberação': data(a.entrada),
     'Dias em fila': a.diasEmFila ?? '',
     Origem: ORIGEM_LABEL[a.origem] || a.origem,
@@ -148,10 +152,35 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
     };
   });
 
+  // O que a semana faz por cada demanda com prazo.
+  const porDemanda = new Map();
+  grade.forEach(slot => slot.alocacoes.forEach(a => {
+    if (!a.prazo || !a.demandaId) return;
+    if (!porDemanda.has(a.demandaId)) porDemanda.set(a.demandaId, { qtd: 0, porDia: new Map(), cams: new Set() });
+    const d = porDemanda.get(a.demandaId);
+    d.qtd++;
+    d.porDia.set(slot.dia, (d.porDia.get(slot.dia) || 0) + 1);
+    d.cams.add(a.cam || '(sem CAM)');
+  }));
+
+  // Quantas RMs com prazo cada CAM tem em cada dia: é o mesmo destaque
+  // que o PDF dá em âmbar, aqui em coluna para poder filtrar.
+  const prazoPorCamDia = new Map();
+  grade.forEach(slot => slot.alocacoes.forEach(a => {
+    if (!a.prazo) return;
+    const chave = `${a.cam || '(sem CAM)'}||${slot.dia}`;
+    prazoPorCamDia.set(chave, (prazoPorCamDia.get(chave) || 0) + 1);
+  }));
+  const comPrazoDoCam = (cam) => grade.reduce((t, s) => t + (prazoPorCamDia.get(`${cam}||${s.dia}`) || 0), 0);
+
   const gradePorCam = porCam.map(l => ({
     CAM: l.cam,
-    ...Object.fromEntries(grade.map(s => [formatarBr(s.dia), l.porDia[s.dia] || 0])),
-    Total: l.total
+    ...Object.fromEntries(grade.flatMap(s => [
+      [formatarBr(s.dia), l.porDia[s.dia] || 0],
+      [`${formatarBr(s.dia)} c/ prazo`, prazoPorCamDia.get(`${l.cam}||${s.dia}`) || 0]
+    ])),
+    Total: l.total,
+    'Total c/ prazo': comPrazoDoCam(l.cam)
   }));
 
   // A aba que vai para a tela do WMS: uma linha por capa de lote.
@@ -160,15 +189,19 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
     Bloco: b.ordem,
     CAM: b.cam,
     RMs: b.qtd,
+    'RMs com prazo': b.comPrazo || 0,
     'Em aberto no CAM': b.pendentesDoCam,
     'O que marcar na tela': b.cobertura === 'TOTAL'
       ? 'Tudo o que o CAM tem em aberto'
       : b.cobertura === 'ATE_O_CORTE'
         ? `Da mais antiga até a RM ${b.corte?.rm}`
-        : `Até a RM ${b.corte?.rm}, exceto as listadas ao lado`,
+        : b.cobertura === 'CORTE_MAIS_AVULSAS'
+          ? `Até a RM ${b.corte?.rm} + as avulsas ao lado`
+          : 'Só as avulsas ao lado',
     'RM do corte': b.corte?.rm || '',
     'Liberação do corte': data(b.corte?.entrada),
-    'NÃO marcar': (b.faltando || []).join(' ')
+    'RMs no trecho': b.ateOCorte ?? '',
+    'Marcar também (avulsas)': (b.avulsas || []).join(' ')
   }));
 
   montarLivro([
@@ -193,15 +226,24 @@ export const exportarExcelSeparacao = ({ snapshot, semanaRef, versao, emitidoEm 
     },
     {
       nome: 'Demandas com prazo',
-      linhas: (snapshot.demandas || []).map(d => ({
-        Origem: ORIGEM_LABEL[d.origem] || d.origem,
-        Referência: d.referencia || '',
-        'RMs informadas': d.qtd,
-        'RMs nesta semana': d.qtdNaSemana ?? '',
-        Prazo: data(d.prazo),
-        'Separar até': data(limiteDeSeparacao(d.prazo, d.diasExpedicao)),
-        'Dias p/ expedição': d.diasExpedicao
-      }))
+      linhas: (snapshot.demandas || []).map(d => {
+        const limite = limiteDeSeparacao(d.prazo, d.diasExpedicao);
+        const naGrade = porDemanda.get(d.id);
+        const dias = naGrade ? Array.from(naGrade.porDia.keys()).sort() : [];
+        const ultimo = dias.length ? dias[dias.length - 1] : null;
+        return {
+          Origem: ORIGEM_LABEL[d.origem] || d.origem,
+          Referência: d.referencia || '',
+          'RMs informadas': d.qtd,
+          'RMs nesta semana': naGrade ? naGrade.qtd : (d.qtdNaSemana ?? 0),
+          'Separação em': dias.map(x => `${formatarBr(x)} (${naGrade.porDia.get(x)})`).join(', '),
+          CAMs: naGrade ? Array.from(naGrade.cams).join(', ') : '',
+          Prazo: data(d.prazo),
+          'Separar até': data(limite),
+          'Dias p/ expedição': d.diasExpedicao,
+          Situação: !ultimo ? 'não programada' : (limite && ultimo > limite ? 'atrasa' : 'no prazo')
+        };
+      })
     },
     {
       nome: 'Dias sem separação',

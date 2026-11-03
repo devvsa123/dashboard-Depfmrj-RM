@@ -107,10 +107,36 @@ export const criarDocumento = ({ rodape }) => {
     const alturaLinhaTexto = mm(tamanho) * 1.25;
     const respiro = 1.1;
 
+    // Uma célula pode ser um número só ou um texto em pedaços de cores
+    // diferentes — { partes: [{ texto, cor, forte }] }. É o que permite
+    // dizer, numa casa só da grade, quanto é fila e quanto é prazo.
+    const ehSegmentada = (valor) => Boolean(valor && Array.isArray(valor.partes));
+    const textoDaSegmentada = (valor) => valor.partes.map(x => x.texto).join('');
+
     const celulas = (linha) => colunas.map((c, i) => {
+      const valor = linha[c.key];
+      if (ehSegmentada(valor)) return [textoDaSegmentada(valor)];
       fonte(tamanho, c.forte ? 'bold' : 'normal');
-      return doc.splitTextToSize(String(linha[c.key] ?? ''), larguras[i] - 3);
+      return doc.splitTextToSize(String(valor ?? ''), larguras[i] - 3);
     });
+
+    // Desenha a célula em pedaços, cada um com a sua cor, numa linha só.
+    const desenharSegmentada = (valor, c, i, py, destaque) => {
+      const larguraDe = (parte) => {
+        fonte(tamanho, parte.forte || destaque || c.forte ? 'bold' : 'normal');
+        return doc.getTextWidth(parte.texto);
+      };
+      const total = valor.partes.reduce((t, parte) => t + larguraDe(parte), 0);
+      let px = c.align === 'right'
+        ? xs[i] + larguras[i] - 1.5 - total
+        : c.align === 'center' ? xs[i] + larguras[i] / 2 - total / 2 : xs[i] + 1.5;
+      valor.partes.forEach(parte => {
+        const largura = larguraDe(parte);
+        fonte(tamanho, parte.forte || destaque || c.forte ? 'bold' : 'normal', parte.cor || SUAVE);
+        doc.text(parte.texto, px, py, { baseline: 'top' });
+        px += largura;
+      });
+    };
 
     const desenharCabecalho = () => {
       const altura = alturaLinhaTexto + respiro * 2;
@@ -147,6 +173,11 @@ export const criarDocumento = ({ rodape }) => {
         doc.rect(MARGEM.esq, y, LARGURA_UTIL, altura, 'F');
       }
       colunas.forEach((c, i) => {
+        const valor = linha[c.key];
+        if (ehSegmentada(valor)) {
+          desenharSegmentada(valor, c, i, y + respiro, destaque);
+          return;
+        }
         const cor = linha[`${c.key}_cor`] || (destaque || c.forte ? TINTA : SUAVE);
         fonte(tamanho, destaque || c.forte ? 'bold' : 'normal', cor);
         const px = c.align === 'right' ? xs[i] + larguras[i] - 1.5 : c.align === 'center' ? xs[i] + larguras[i] / 2 : xs[i] + 1.5;

@@ -41,6 +41,9 @@ export const montarSnapshot = ({ resultado, bloqueios, demandas }) => ({
       origem: a.origem,
       justificativa: a.justificativa,
       prazo: a.prazo || null,
+      // Qual demanda com prazo trouxe esta RM. É o que permite o
+      // documento dizer, por demanda, o que está sendo feito.
+      demandaId: a.demandaId || null,
       diasEmFila: a.diasEmFila ?? null,
       // A data de liberação da RM no WMS. Vai no snapshot porque é por
       // ela que as listas são ordenadas: é assim que o WMS mostra as

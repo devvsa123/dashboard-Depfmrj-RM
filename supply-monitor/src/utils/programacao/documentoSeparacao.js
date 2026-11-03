@@ -1,4 +1,4 @@
-import { criarDocumento, TINTA, SUAVE, VERMELHO, AMBAR } from './pdfTexto';
+import { criarDocumento, TINTA, SUAVE, CLARO, VERMELHO, AMBAR } from './pdfTexto';
 import { DIAS_SEMANA, formatarBr, formatarCurto, rotuloSemana } from './semana';
 import { ORIGENS, limiteDeSeparacao } from './motor';
 import { agruparParaAnexo, ordemDeLiberacao, sufixoDeArquivo } from './versoes';
@@ -45,6 +45,29 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
   let n = 0;
   const num = () => String(++n);
 
+  // ── As RMs com prazo, isoladas ────────────────────────────────────
+  //
+  // Demanda com prazo é compromisso formal, e o programador precisa
+  // vê-la sem procurar: ela aparece destacada na grade, nos blocos de
+  // marcação e numa tabela que diz, por demanda, o que está sendo
+  // feito. O documento não cresce por isso — as mesmas tabelas passam
+  // a distinguir o que é prazo do que é fila.
+  const temPrazo = (a) => Boolean(a.prazo);
+  const prazoPorCamDia = new Map();
+  const prazoPorDemanda = new Map();
+  grade.forEach(slot => slot.alocacoes.forEach(a => {
+    if (!temPrazo(a)) return;
+    const chave = `${a.cam || '(sem CAM)'}||${slot.dia}`;
+    prazoPorCamDia.set(chave, (prazoPorCamDia.get(chave) || 0) + 1);
+    if (!a.demandaId) return;
+    if (!prazoPorDemanda.has(a.demandaId)) prazoPorDemanda.set(a.demandaId, { qtd: 0, porDia: new Map(), cams: new Set() });
+    const d = prazoPorDemanda.get(a.demandaId);
+    d.qtd++;
+    d.porDia.set(slot.dia, (d.porDia.get(slot.dia) || 0) + 1);
+    d.cams.add(a.cam || '(sem CAM)');
+  }));
+  const totalComPrazo = grade.reduce((t, s) => t + s.alocacoes.filter(temPrazo).length, 0);
+
   // ── 1. Resumo ─────────────────────────────────────────────────────
   p.secao(num(), 'Resumo da Semana');
   p.numeros([
@@ -72,6 +95,26 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
   p.paragrafo('Cada CAM é atendido num único dia da semana, para que a reserva no WMS seja montada de uma vez: '
     + 'um cliente, uma capa de lote. Um CAM só aparece em mais de um dia quando tem mais RMs do que cabe num dia '
     + 'inteiro — nesse caso a divisão vem avisada nas observações.');
+  if (totalComPrazo > 0) {
+    p.texto('Nas casas com dois números, o primeiro é a fila por antiguidade e o segundo, em âmbar, são as RMs de '
+      + 'demanda com prazo.', { tamanho: 7.5, cor: SUAVE, espacoDepois: 2 });
+  }
+  // Uma casa pode valer duas coisas: quanto sai pela fila e quanto sai
+  // por compromisso de prazo. Separar as duas numa casa só evita uma
+  // tabela a mais e põe o prazo onde ele é lido.
+  const casaDaGrade = (cam, dia, total) => {
+    if (!total) return '—';
+    const prazo = prazoPorCamDia.get(`${cam}||${dia}`) || 0;
+    if (!prazo) return String(total);
+    if (prazo === total) return { partes: [{ texto: String(prazo), cor: AMBAR, forte: true }] };
+    return {
+      partes: [
+        { texto: String(total - prazo), cor: SUAVE },
+        { texto: ' + ', cor: CLARO },
+        { texto: String(prazo), cor: AMBAR, forte: true }
+      ]
+    };
+  };
   p.tabela({
     colunas: [
       { key: 'cam', label: 'CAM', largura: 0.34, forte: true },
@@ -80,7 +123,7 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
     ],
     linhas: porCam.map(l => ({
       cam: l.cam,
-      ...Object.fromEntries(grade.map(s => [s.dia, l.porDia[s.dia] || '—'])),
+      ...Object.fromEntries(grade.map(s => [s.dia, casaDaGrade(l.cam, s.dia, l.porDia[s.dia] || 0)])),
       total: l.total
     })),
     rodape: {
@@ -103,32 +146,43 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
     p.paragrafo('Uma linha por capa de lote. Filtre o cliente na AK050 e marque como diz a coluna "O que marcar": '
       + '"tudo" quando o bloco é tudo o que o cliente tem em aberto, ou "até a RM X" quando a semana leva só a parte '
       + 'mais antiga — a tela ordena por antiguidade, então é da primeira linha até essa RM, sem pular nenhuma. '
-      + 'Bloco com exceção é o único que pede conferência, e as RMs a NÃO marcar vêm escritas.');
+      + 'Quando uma demanda com prazo pede RMs fora dessa ordem, elas vêm somadas e nomeadas: marque o trecho e '
+      + 'acrescente as avulsas. Nunca é preciso desmarcar nada.');
     p.tabela({
       colunas: [
         { key: 'dia', label: 'Dia', largura: 0.13 },
         { key: 'ordem', label: 'Bloco', largura: 0.07, align: 'center' },
         { key: 'cam', label: 'CAM', largura: 0.3, forte: true },
         { key: 'qtd', label: 'RMs', largura: 0.09, align: 'center', forte: true },
-        { key: 'marcar', label: 'O que marcar na tela', largura: 0.41 }
+        { key: 'prazo', label: 'C/ prazo', largura: 0.09, align: 'center' },
+        { key: 'marcar', label: 'O que marcar na tela', largura: 0.32 }
       ],
       linhas: blocos.map(b => ({
         dia: formatarCurto(b.dia),
         ordem: b.ordem,
         cam: b.cam,
         qtd: b.qtd,
+        prazo: b.comPrazo ? String(b.comPrazo) : '—',
+        prazo_cor: b.comPrazo ? AMBAR : undefined,
         marcar: b.cobertura === 'TOTAL'
           ? `Tudo o que o CAM tem em aberto (${b.pendentesDoCam})`
           : b.cobertura === 'ATE_O_CORTE'
-            ? `Da mais antiga até a RM ${b.corte?.rm} (liberada em ${formatarBr(b.corte?.entrada)})`
-            : `Até a RM ${b.corte?.rm}, EXCETO ${b.faltando.length} RM(s): ${b.faltando.slice(0, 6).join(', ')}${b.faltando.length > 6 ? '...' : ''}`,
-        marcar_cor: b.cobertura === 'COM_EXCECOES' ? AMBAR : undefined
+            ? `Da mais antiga até a RM ${b.corte?.rm} (${formatarBr(b.corte?.entrada)})`
+            : b.cobertura === 'CORTE_MAIS_AVULSAS'
+              ? `Até a RM ${b.corte?.rm} (${b.ateOCorte}) + ${b.avulsas.length} avulsa(s): ${b.avulsas.join(', ')}`
+              : `Só estas ${b.avulsas.length}: ${b.avulsas.join(', ')}`,
+        marcar_cor: b.avulsas.length ? AMBAR : undefined
       }))
     });
-    const comExcecao = blocos.filter(b => b.cobertura === 'COM_EXCECOES');
+    const comAvulsas = blocos.filter(b => b.avulsas.length > 0);
     const empates = blocos.filter(b => b.cobertura === 'ATE_O_CORTE' && b.empateNoCorte > 1);
-    if (comExcecao.length === 0) {
-      p.texto(`Nenhum dos ${blocos.length} blocos exige conferência RM a RM.`, { tamanho: 7.5, cor: SUAVE, espacoDepois: 2 });
+    if (comAvulsas.length === 0) {
+      p.texto(`Nos ${blocos.length} blocos, a marcação é contínua: nenhuma RM avulsa a procurar.`,
+        { tamanho: 7.5, cor: SUAVE, espacoDepois: 2 });
+    } else {
+      const avulsas = comAvulsas.reduce((t, b) => t + b.avulsas.length, 0);
+      p.texto(`${avulsas} RM(s) avulsa(s) em ${comAvulsas.length} bloco(s), todas de demanda com prazo: marque o `
+        + 'trecho contínuo e acrescente as RMs nomeadas acima.', { tamanho: 7.5, cor: AMBAR, espacoDepois: 2 });
     }
     if (empates.length > 0) {
       p.texto(`Em ${empates.length} bloco(s) o corte cai numa data com mais de uma RM do mesmo CAM; se a tela não `
@@ -188,25 +242,51 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
     });
   }
 
-  // ── 5. Demandas com prazo ─────────────────────────────────────────
+  // ── 5. Demandas com prazo: o que está sendo feito com cada uma ────
+  //
+  // Uma linha por demanda, com o que a semana faz por ela: quantas RMs
+  // entraram, em que dias, e se a separação termina a tempo. É a tabela
+  // que responde "e a minha mensagem?" sem folhear o documento.
   if (comPrazo.length > 0) {
     p.secao(num(), 'Demandas com Prazo');
+    p.paragrafo('O que esta semana faz por cada demanda com prazo. "Na semana" é quanto entrou na grade; '
+      + '"separação em" são os dias em que essas RMs serão separadas. O prazo é de prontificação, por isso a '
+      + 'separação precisa terminar antes — é a coluna "separar até".');
     p.tabela({
       colunas: [
-        { key: 'ref', label: 'Origem / Referência', largura: 0.36, forte: true },
-        { key: 'rms', label: 'RMs informadas', largura: 0.16, align: 'center' },
-        { key: 'prazo', label: 'Prazo', largura: 0.16, align: 'center' },
-        { key: 'limite', label: 'Separar até', largura: 0.16, align: 'center' },
-        { key: 'exp', label: 'Dias exped.', largura: 0.16, align: 'center' }
+        { key: 'ref', label: 'Origem / Referência', largura: 0.27, forte: true },
+        { key: 'rms', label: 'RMs', largura: 0.07, align: 'center' },
+        { key: 'semana', label: 'Na semana', largura: 0.11, align: 'center' },
+        { key: 'dias', label: 'Separação em', largura: 0.21, align: 'center' },
+        { key: 'prazo', label: 'Prazo', largura: 0.12, align: 'center' },
+        { key: 'limite', label: 'Separar até', largura: 0.12, align: 'center' },
+        { key: 'situacao', label: 'Situação', largura: 0.10, align: 'right' }
       ],
-      linhas: comPrazo.map(d => ({
-        ref: `${ORIGEM_LABEL[d.origem] || d.origem}${d.referencia ? ` — ${d.referencia}` : ''}`,
-        rms: d.qtd,
-        prazo: formatarBr(d.prazo),
-        limite: formatarBr(limiteDeSeparacao(d.prazo, d.diasExpedicao)),
-        exp: `${d.diasExpedicao} úteis`
-      }))
+      linhas: comPrazo.map(d => {
+        const limite = limiteDeSeparacao(d.prazo, d.diasExpedicao);
+        const naGrade = prazoPorDemanda.get(d.id);
+        const dias = naGrade ? Array.from(naGrade.porDia.keys()).sort() : [];
+        const ultimo = dias.length ? dias[dias.length - 1] : null;
+        const dentro = ultimo && limite ? ultimo <= limite : null;
+        const fora = (d.qtdNaSemana ?? 0) < (d.qtd ?? 0);
+        return {
+          ref: `${ORIGEM_LABEL[d.origem] || d.origem}${d.referencia ? ` — ${d.referencia}` : ''}`,
+          rms: d.qtd,
+          semana: naGrade ? naGrade.qtd : (d.qtdNaSemana ?? 0),
+          semana_cor: naGrade && naGrade.qtd ? AMBAR : VERMELHO,
+          dias: dias.length
+            ? dias.map(x => `${formatarCurto(x)} (${naGrade.porDia.get(x)})`).join(', ')
+            : 'não programada',
+          prazo: formatarBr(d.prazo),
+          limite: formatarBr(limite),
+          situacao: dentro === null ? '—' : dentro ? (fora ? 'parcial' : 'no prazo') : 'atrasa',
+          situacao_cor: dentro === false ? VERMELHO : dentro && !fora ? undefined : AMBAR
+        };
+      })
     });
+    p.texto(`${totalComPrazo} RM(s) de demanda com prazo nesta semana, de ${comPrazo.length} demanda(s). `
+      + 'Na grade por CAM elas aparecem em âmbar, separadas da fila por antiguidade.',
+    { tamanho: 7.5, cor: SUAVE, espacoDepois: 2 });
   }
 
   // ── 6. Observações ────────────────────────────────────────────────
@@ -238,7 +318,7 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
       // Na fila por antiguidade a justificativa carrega os dias de cada
       // RM, então agrupar por ela devolveria um grupo por RM.
       const chave = ehFila(a.origem) ? `FILA||${cam}` : `${a.justificativa}||${cam}`;
-      if (!grupos.has(chave)) grupos.set(chave, { justificativa: a.justificativa, cam, origem: a.origem, rms: [], dias: [] });
+      if (!grupos.has(chave)) grupos.set(chave, { justificativa: a.justificativa, cam, origem: a.origem, prazo: a.prazo || null, rms: [], dias: [] });
       const g = grupos.get(chave);
       g.rms.push({ rm: a.rm, entrada: a.entrada || null });
       if (a.diasEmFila != null) g.dias.push(a.diasEmFila);
@@ -271,8 +351,12 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
       p.regua([203, 213, 225], 0.2, 2);
       grupos.forEach(g => {
         p.reservar(12);
-        p.texto(`${g.cam} — ${g.rms.length} RM(s)   ·   ${g.justificativa}`,
-          { tamanho: 8, estilo: 'bold', cor: TINTA, espacoDepois: 0.5 });
+        // Grupo de demanda com prazo sai em âmbar e com a marca: é o que
+        // o programador procura primeiro quando abre o anexo.
+        const cabecalho = g.prazo
+          ? `${g.cam} — ${g.rms.length} RM(s)   ·   PRAZO ${formatarBr(g.prazo)} · ${g.justificativa}`
+          : `${g.cam} — ${g.rms.length} RM(s)   ·   ${g.justificativa}`;
+        p.texto(cabecalho, { tamanho: 8, estilo: 'bold', cor: g.prazo ? AMBAR : TINTA, espacoDepois: 0.5 });
         p.gradeDeRms(g.rms.map(r => ({ rm: r.rm, nota: r.entrada ? formatarBr(r.entrada).slice(0, 5) : '' })), { colunas: 5 });
       });
       p.y += 2;

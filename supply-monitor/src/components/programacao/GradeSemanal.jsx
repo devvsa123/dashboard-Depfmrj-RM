@@ -67,6 +67,17 @@ const GradeSemanal = ({ resultado }) => {
   if (!resultado) return null;
   const { grade, porCam, alertas, resumo } = resultado;
 
+  // Quantas RMs de demanda com prazo cada CAM tem em cada dia. Na tabela
+  // elas aparecem destacadas ao lado da fila por antiguidade: é o mesmo
+  // destaque do documento, e é o que o programador procura primeiro.
+  const prazoPorCamDia = new Map();
+  grade.forEach(slot => slot.alocacoes.forEach(a => {
+    if (!a.prazo) return;
+    const chave = `${a.cam || '(sem CAM)'}||${slot.dia}`;
+    prazoPorCamDia.set(chave, (prazoPorCamDia.get(chave) || 0) + 1);
+  }));
+  const totalComPrazo = Array.from(prazoPorCamDia.values()).reduce((t, n) => t + n, 0);
+
   return (
     <div className="space-y-5">
       <DetalheDia slot={detalhe} onClose={() => setDetalhe(null)} />
@@ -145,8 +156,13 @@ const GradeSemanal = ({ resultado }) => {
           <h3 className="text-lg font-black text-slate-800">Atendimento por CAM</h3>
           <InfoButton
             title="O foco do documento"
-            description="Esta é a tabela que vai para o documento da programação: quantas RMs cada CAM recebe em cada dia da semana. É por ela que a chefia e os clientes leem a semana."
+            description="Esta é a tabela que vai para o documento da programação: quantas RMs cada CAM recebe em cada dia da semana. É por ela que a chefia e os clientes leem a semana. Nas casas com dois números, o primeiro é a fila por antiguidade e o segundo, em âmbar, são as RMs de demanda com prazo."
           />
+          {totalComPrazo > 0 && (
+            <span className="ml-auto text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">
+              {totalComPrazo} com prazo
+            </span>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left text-slate-600">
@@ -161,11 +177,23 @@ const GradeSemanal = ({ resultado }) => {
               {porCam.map((linha, idx) => (
                 <tr key={linha.cam} className={`border-b border-slate-50 ${idx % 2 ? 'bg-slate-50/40' : ''}`}>
                   <td className="px-4 py-2.5 font-bold text-slate-800">{linha.cam}</td>
-                  {grade.map(s => (
-                    <td key={s.dia} className="px-3 py-2.5 text-center font-medium">
-                      {linha.porDia[s.dia] || <span className="text-slate-200">—</span>}
-                    </td>
-                  ))}
+                  {grade.map(s => {
+                    const total = linha.porDia[s.dia] || 0;
+                    const prazo = prazoPorCamDia.get(`${linha.cam}||${s.dia}`) || 0;
+                    return (
+                      <td key={s.dia} className="px-3 py-2.5 text-center font-medium">
+                        {!total && <span className="text-slate-200">—</span>}
+                        {total > 0 && prazo === 0 && total}
+                        {total > 0 && prazo > 0 && (
+                          <span title={`${total - prazo} por antiguidade · ${prazo} com prazo`}>
+                            {total > prazo && <span>{total - prazo}</span>}
+                            {total > prazo && <span className="text-slate-300"> + </span>}
+                            <span className="font-black text-amber-600">{prazo}</span>
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
                   <td className="px-4 py-2.5 text-right font-black text-slate-900">{linha.total}</td>
                 </tr>
               ))}
