@@ -1,3 +1,4 @@
+import { estaNaFila } from './capacidade';
 // Extração de RMs de texto colado. O programador copia a relação de uma
 // mensagem SIGAD, de um e-mail ou de uma conversa — o formato varia e não
 // vale a pena tentar interpretar o documento inteiro. O que não varia é o
@@ -29,6 +30,7 @@ export const extrairRms = (texto) => {
 // no meio da semana.
 export const SITUACOES = {
   EM_FILA: 'EM_FILA',
+  EM_PROCESSAMENTO: 'EM_PROCESSAMENTO',
   CONFERIDA: 'CONFERIDA',
   JA_EXPEDIDA: 'JA_EXPEDIDA',
   CANCELADA: 'CANCELADA',
@@ -36,7 +38,8 @@ export const SITUACOES = {
 };
 
 export const SITUACAO_LABEL = {
-  EM_FILA: 'Em fila — será programada',
+  EM_FILA: 'Em planejamento — será programada',
+  EM_PROCESSAMENTO: 'Já na fila do WMS — acompanhe no Andamento',
   CONFERIDA: 'Já conferida — com a Expedição',
   JA_EXPEDIDA: 'Já expedida — nada a fazer',
   CANCELADA: 'Cancelada no WMS',
@@ -53,6 +56,10 @@ export const conferirRms = (rms, indiceWms) => {
     if (info.situacao === 'CONFERIDO') { resultado[SITUACOES.CONFERIDA].push({ rm, ...info }); return; }
     if (info.situacao === 'EXPEDIDO') { resultado[SITUACOES.JA_EXPEDIDA].push({ rm, ...info }); return; }
     if (info.situacao === 'CANCELADO') { resultado[SITUACOES.CANCELADA].push({ rm, ...info }); return; }
+    // Situação intermediária: a RM já tem reserva e capa de lote no WMS.
+    // Programá-la de novo mandaria montar uma capa que já existe — o que
+    // ela precisa é de acompanhamento, não de programação.
+    if (!estaNaFila(info.situacao)) { resultado[SITUACOES.EM_PROCESSAMENTO].push({ rm, ...info }); return; }
     resultado[SITUACOES.EM_FILA].push({ rm, ...info });
   });
   return resultado;

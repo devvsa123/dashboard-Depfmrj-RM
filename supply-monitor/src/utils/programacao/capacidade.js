@@ -77,13 +77,36 @@ export const medirCapacidade = (data, janelaDias = 365) => {
   };
 };
 
-// O que JÁ SAIU da fila de separação. CONFERIDO entra aqui: nesse ponto o
+// Situação comparável: maiúscula, sem acento, espaço colapsado. O
+// arquivo do PWA alterna "EM PLANEJAMENTO" e "Em Planejamento".
+export const normalizarStatus = (s) => String(s || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toUpperCase()
+  .replace(/\s+/g, ' ')
+  .trim();
+
+// A FILA DE SEPARAÇÃO é só o primeiro status do ciclo: EM PLANEJAMENTO.
+//
+// Uma RM em situação intermediária — reservada, em separação, separada,
+// em conferência — JÁ ENTROU na fila do WMS em algum momento: ela tem
+// capa de lote e reserva. Programá-la de novo seria mandar o operador
+// montar uma capa que já existe, e inflaria a fila com trabalho que já
+// está em andamento. O que acontece com essas é assunto da aba Análise
+// da Fila, que mede o que está em processamento, e da aba Andamento,
+// que acompanha a semana publicada.
+export const STATUS_DA_FILA = new Set(['EM PLANEJAMENTO', 'PLANEJAMENTO']);
+
+export const estaNaFila = (situacao) => STATUS_DA_FILA.has(normalizarStatus(situacao));
+
+// O que JÁ SAIU das mãos do depósito. CONFERIDO entra aqui: nesse ponto o
 // pedido está pronto e entregue à Expedição, então o trabalho do depósito
-// naquela RM acabou — programá-la de novo seria contar duas vezes. É a
-// mesma régua que define "atendido" para efeito de prazo.
+// naquela RM acabou. Serve para escolher qual situação representa a RM
+// quando ela tem mais de uma linha no mesmo ciclo — não para montar a
+// fila, que é mais estreita.
 export const STATUS_FORA_DA_FILA = new Set(['CONFERIDO', 'EXPEDIDO', 'CANCELADO']);
 
-export const estaNaFila = (situacao) => !STATUS_FORA_DA_FILA.has(String(situacao || '').toUpperCase().trim());
+export const dependeDoDeposito = (situacao) => !STATUS_FORA_DA_FILA.has(normalizarStatus(situacao));
 
 // Índice rápido RM -> situação atual no WMS, usado para conferir as RMs
 // coladas e para montar a fila de atendimento.
@@ -143,7 +166,15 @@ export const indexarWms = (data) => {
     const c = ciclos.get(chaveCiclo);
     c.linhas++;
     const situacao = String(item.STATUS || '').toUpperCase().trim();
-    if (c.situacao === null || (estaNaFila(situacao) && !estaNaFila(c.situacao))) c.situacao = situacao;
+    // Liberação parcial: entre linhas do mesmo ciclo vale a que ainda
+    // depende do depósito, e entre essas a que está mais atrás — uma RM
+    // com uma linha em planejamento ainda tem o que planejar.
+    const mandaMais = (nova, atual) => {
+      if (atual === null) return true;
+      if (dependeDoDeposito(nova) !== dependeDoDeposito(atual)) return dependeDoDeposito(nova);
+      return estaNaFila(nova) && !estaNaFila(atual);
+    };
+    if (mandaMais(situacao, c.situacao)) c.situacao = situacao;
     if (!c.cam && item.CAM) c.cam = String(item.CAM).trim();
     if (!c.documento && item.STC) c.documento = String(item.STC).trim();
     if (!c.tipoRm && item.TIPO_RM) c.tipoRm = String(item.TIPO_RM).trim();
@@ -170,10 +201,11 @@ export const indexarWms = (data) => {
   return indice;
 };
 
-// A fila de SEPARAÇÃO: RMs que ainda dependem de trabalho do depósito, da
-// mais antiga para a mais nova. É a ordem padrão de atendimento quando não
-// há prazo mandando. Não confundir com a "fila em aberto" das outras abas
-// do dashboard, que inclui as CONFERIDAS aguardando expedição.
+// A fila de SEPARAÇÃO: RMs em planejamento, da mais antiga para a mais
+// nova. É a ordem padrão de atendimento quando não há prazo mandando.
+// Não confundir com a "fila em aberto" das outras abas do dashboard, que
+// inclui as conferidas aguardando expedição, nem com a Análise da Fila,
+// que mede o que já está em processamento.
 export const filaPorAntiguidade = (indiceWms, hojeIso) => {
   const fila = [];
   indiceWms.forEach(info => {

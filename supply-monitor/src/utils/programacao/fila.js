@@ -1,5 +1,6 @@
 import { diffDias, hojeIso } from './semana';
 import { TRATAMENTOS } from './rotas';
+import { normalizarStatus } from './capacidade';
 
 // -----------------------------------------------------------------------
 // Análise da fila — o retrato do que está em processamento agora.
@@ -23,14 +24,8 @@ import { TRATAMENTOS } from './rotas';
 // ninguém notar.
 // -----------------------------------------------------------------------
 
-// Situação comparável: maiúscula, sem acento, espaço colapsado. O arquivo
-// alterna "EM SEPARACAO" e "Em Separação" entre exportações.
-export const normalizarStatus = (s) => String(s || '')
-  .normalize('NFD')
-  .replace(/[̀-ͯ]/g, '')
-  .toUpperCase()
-  .replace(/\s+/g, ' ')
-  .trim();
+// A normalização de situação é a mesma do resto da programação.
+export { normalizarStatus } from './capacidade';
 
 const FORA_EXATO = new Map([
   ['EM PLANEJAMENTO', 'Primeiro status: o pedido chegou e ainda não entrou em trabalho'],

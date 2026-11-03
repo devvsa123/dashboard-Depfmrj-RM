@@ -81,7 +81,8 @@ export const gerarPdfSeparacao = ({ snapshot, diff, semanaRef, programador, enca
     `Das ${resumo.totalProgramado} RMs programadas, ${resumo.comPrazo} atendem demanda com prazo definido`
     + (resumo.porRota ? `, ${resumo.porRota} foram alocadas para pegar a rota do próprio CAM dentro da semana` : '')
     + ` e ${resumo.porAntiguidade} saem da fila por antiguidade. A fila de separação soma ${resumo.filaTotal} RMs — `
-    + 'pedidos que ainda dependem de trabalho do depósito, sem contar os já conferidos e entregues à Expedição.'
+    + 'pedidos em planejamento, à espera de reserva no WMS. Os que já estão reservados ou em separação não entram '
+    + 'aqui: eles já foram para a fila do WMS e são acompanhados nas abas de Análise da Fila e de Andamento.'
     + (resumo.reemitidasNaFila
       ? ` Dessas, ${resumo.reemitidasNaFila} são RMs que já tinham sido canceladas e voltaram: elas contam pela data de entrada do ciclo novo, não pela do antigo.`
       : '')

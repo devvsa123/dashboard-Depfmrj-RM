@@ -254,13 +254,13 @@ const FilaPanel = ({ indiceWms, porCam, capacidadeMedida, ultimaSync }) => {
                 </div>
               ))}
             </div>
-            {/* Dois números com o mesmo nome confundem: o da grade conta
-                tudo que ainda depende do depósito, este só o meio do
-                processo. Dizer isso aqui evita a pergunta. */}
+            {/* Dois números com o mesmo nome confundem: um é o que ainda
+                vai ser reservado, o outro o que já está em processamento.
+                Dizer isso aqui evita a pergunta. */}
             <p className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 text-[11px] text-slate-400 font-medium">
-              A <strong className="text-slate-500">fila de separação</strong> que alimenta a grade da semana é outra conta: ela
-              inclui as Em planejamento e as Aguardando conferência, porque todas ainda dependem de trabalho do depósito.
-              Esta análise mede só o que já está em processamento.
+              A <strong className="text-slate-500">fila de separação</strong> que alimenta a grade da semana é a outra ponta:
+              são as RMs <strong className="text-slate-500">Em planejamento</strong>, que ainda vão ser reservadas no WMS.
+              Esta análise mede o que já entrou em processamento — por isso as duas contas não se sobrepõem.
             </p>
           </div>
         </div>
