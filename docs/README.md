@@ -1,10 +1,12 @@
-# Documentação para usuários
+# Documentação
 
 | Arquivo | Para quem |
 |---|---|
+| [`tecnica/`](tecnica/README.md) | **Documentação técnica** — como o sistema funciona por dentro |
 | `Manual_do_Operador.pdf` | Programadores — passo a passo com telas |
 | `Documentacao_da_Ferramenta.pdf` | Quem precisa entender o funcionamento e as decisões |
 | `../ADMINISTRACAO.md` | Quem administra o sistema |
+| `../README.md` | Visão geral do repositório e como rodar |
 
 ## Como refazer os PDFs
 
