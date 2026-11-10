@@ -32,6 +32,7 @@ falhar.
 | `GITHUB_STORAGE_TOKEN` *ou* `GITHUB_TOKEN` | — | Token com leitura naquele repositório |
 | `GITHUB_STORAGE_BRANCH` / `GITHUB_BRANCH` | `main` | Branch de onde ler |
 | `GITHUB_STORAGE_PASTAS` | `dados_wms,dados_singra` | Pastas a procurar, além da raiz |
+| `GITHUB_PASTA_INTERFACE` | `dados_interface` | Pasta do par WMS x SINGRA (aba Interface); deve ser a mesma do `.env` do robô |
 | `GITHUB_API_URL` | `https://api.github.com` | Para GitHub Enterprise |
 
 O token fica só no servidor: sem o prefixo `VITE_`, o Vite não o embute no
@@ -88,6 +89,7 @@ mas o código entra no repositório.
 | Login recusado | Usuário sem *Auto Confirm* | Confirmar o usuário no painel do Supabase |
 | Nome errado no documento assinado | Falta `nome` no metadata do usuário | Rodar `supabase/usuarios.sql` |
 | Banco fora do ar numa segunda | Projeto hibernou | Painel do Supabase → *Restore project*; conferir o workflow diário |
+| Aba Interface com faixa amarela "Par WMS × SINGRA indisponível" | O robô do SINGRA ainda não publicou `dados_interface/` (primeiro ciclo depois da atualização do robô, `DESTINO_SINGRA` sem `github`, ou `GITHUB_PASTA_INTERFACE` diferente nos dois lados) | `GET /api/planilhas/status`: `wms-par` e `singra-par` devem estar `achado: true`; conferir o log do robô por "par da interface atualizado" |
 | Planilha não encontrada (404 na função) | Nome ou pasta diferentes no repositório privado | Conferir `GITHUB_STORAGE_PASTAS` e o nome do arquivo |
 | PDF não baixa no celular | Download programático recusado | O sistema abre o PDF numa aba nova; salvar dali |
 | Um CAM não é priorizado nunca | Sem rota cadastrada (`PENDENTE`) | Cadastrar em **CAM e Rotas** |

@@ -53,7 +53,7 @@ existe para buscar as planilhas no repositório privado sem expor o token.
 ## Estrutura do repositório
 
 ```
-├── api/planilhas/[arquivo].js   Função serverless que serve WMS e SINGRA
+├── api/planilhas/[arquivo].js   Função serverless que serve WMS, SINGRA e o par da interface
 ├── docs/                        Documentação (ver abaixo)
 ├── supabase/                    schema.sql, rotas_iniciais.sql, usuarios.sql
 ├── supply-monitor/              A aplicação React

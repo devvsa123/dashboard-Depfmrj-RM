@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { downloadExcel } from './utils/spreadsheet';
 import { useSpreadsheetSync } from './hooks/useSpreadsheetSync';
+import { useParInterface } from './hooks/useParInterface';
 import { useEmailExtractor } from './hooks/useEmailExtractor';
 import { useDashboardAnalytics } from './hooks/useDashboardAnalytics';
 import { useYoyAnalysis } from './hooks/useYoyAnalysis';
@@ -38,13 +39,16 @@ const App = () => {
   const [selectedPiSegment, setSelectedPiSegment] = useState(null);
   const [bucketSearchTerm, setBucketSearchTerm] = useState("");
 
-  const { data, singraData, loading, error, lastSync } = useSpreadsheetSync();
+  const { data, singraData, loading, error, lastSync, libLoaded } = useSpreadsheetSync();
+  // WMS e SINGRA do mesmo momento, só para o cruzamento entre os dois sistemas (ver hooks/useParInterface.js)
+  const { par, status: parStatus } = useParInterface(libLoaded, data.length > 0);
 
   const emailExtractor = useEmailExtractor(data, singraData);
   const dashboardAnalytics = useDashboardAnalytics(data);
   const yoyAnalysis = useYoyAnalysis(data);
   const backlogAnalysis = useBacklogAnalysis(data, singraData);
-  const interfaceAnalysis = useInterfaceAnalysis(data, singraData);
+  // Enquanto o par não chega (ou se o robô ainda não o publicou) usa o ao vivo; a aba avisa qual dos dois está vendo.
+  const interfaceAnalysis = useInterfaceAnalysis(par ? par.wmsData : data, par ? par.singraData : singraData);
   const ai = useAiConsultant({
     chartData: dashboardAnalytics.chartData,
     selectionSummary: dashboardAnalytics.selectionSummary,
@@ -180,6 +184,7 @@ const App = () => {
               selectedErrorFilter={interfaceAnalysis.selectedErrorFilter}
               setSelectedErrorFilter={interfaceAnalysis.setSelectedErrorFilter}
               handleDownloadExcel={downloadExcel}
+              parInfo={{ status: parStatus, wmsMod: par?.wmsMod, singraMod: par?.singraMod }}
             />
           ) : activeTab === 'item' ? (
             <ItemAnalysisTab

@@ -47,6 +47,12 @@ useSpreadsheetSync
   ├─ cache do IndexedDB bate com as duas datas? → usa o cache e para aqui
   ├─ GET das planilhas, leitura com SheetJS, normalização das colunas
   └─ grava no cache e devolve { data, singraData, lastSync }
+
+useParInterface (depois da carga acima)
+  ├─ HEAD /api/planilhas/wms-par e /singra-par → Last-Modified + X-Blob-Sha
+  ├─ 404? → estado `indisponivel` (a aba usa o ao vivo e avisa)
+  ├─ cache `supplyPar` bate com a versão? → usa o cache
+  └─ GET das duas, leitura, cache e devolve { par, status }
 ```
 
 `data` (WMS) e `singraData` (SINGRA) são arrays de objetos, uma entrada por
@@ -58,7 +64,7 @@ linha de planilha. Todo o resto do sistema deriva desses dois arrays.
 |---|---|---|
 | `useDashboardAnalytics` | WMS | série diária, SLA, comparação de período |
 | `useBacklogAnalysis` | WMS + SINGRA | fila em aberto, aging, top ofensores |
-| `useInterfaceAnalysis` | WMS + SINGRA | divergências entre os dois sistemas |
+| `useInterfaceAnalysis` | WMS + SINGRA **do mesmo momento** (`useParInterface`; ao vivo se o par não existir) | divergências entre os dois sistemas |
 | `useStcGtcAnalysis` | WMS | documentos STC/GTC, fechamento, aging |
 | `useItemAnalysis` | WMS | curva ABC por nomenclatura |
 | `useCamAnalysis` | WMS | desempenho por cliente |
@@ -133,11 +139,14 @@ tela. Trocar a regra de alocação é mexer num arquivo só.
 |---|---|
 | `GET /api/planilhas/wms` | Baixa `planilha_estoque.xls` do repositório privado e repassa em streaming |
 | `GET /api/planilhas/singra` | O mesmo para `planilha_rms_unificada.csv` |
-| `HEAD` de qualquer uma | Devolve só `Last-Modified` — é o que o cache usa |
+| `GET /api/planilhas/wms-par` e `/singra-par` | O par da interface (WMS do início do ciclo do SINGRA + SINGRA do ciclo), da pasta `dados_interface/`. 404 enquanto o robô não publicou |
+| `HEAD` de qualquer uma | Devolve só `Last-Modified` e `X-Blob-Sha` — é o que o cache usa |
 | `GET /api/planilhas/status` | Diz onde cada planilha foi achada e quando foi enviada |
 
 A planilha é procurada na raiz do repositório e nas pastas de
-`GITHUB_STORAGE_PASTAS` (padrão `dados_wms,dados_singra`). O token nunca
+`GITHUB_STORAGE_PASTAS` (padrão `dados_wms,dados_singra`). O par só é procurado
+em `GITHUB_PASTA_INTERFACE` (padrão `dados_interface`), nunca na raiz nem nas
+pastas dos robôs. O token nunca
 sai do servidor: as variáveis não têm o prefixo `VITE_`, então o Vite não
 as embute no pacote do navegador.
 

@@ -101,5 +101,5 @@ export const useSpreadsheetSync = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [libLoaded]);
 
-  return { data, singraData, loading, error, lastSync, performSync };
+  return { data, singraData, loading, error, lastSync, performSync, libLoaded };
 };

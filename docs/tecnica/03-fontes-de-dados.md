@@ -122,6 +122,38 @@ site no navegador (o IndexedDB `SupplyMonitorDB`) e recarregue. Ligar um
 botão de "sincronizar agora" a essa função é uma melhoria pendente de
 baixo custo.
 
+## Par WMS x SINGRA (aba Interface)
+
+O WMS é publicado a cada ~5 min; o SINGRA, a cada ~30 (a extração leva ~12 min e o robô espera mais 20 depois dela).
+Cruzar o SINGRA de 20 min atrás com o WMS de agora faz a aba **Interface SINGRA x WMS** acusar como "falha" tudo que um
+operador mexeu no WMS nesse intervalo (ex.: `WMS: CONFERIDO` × `SINGRA: Em Separação`): o SINGRA ainda não tinha recebido,
+mas a lista pede ao operador que vá corrigir.
+
+Por isso o robô do SINGRA publica, a cada ciclo, o **par** na pasta `dados_interface/` do repositório de planilhas:
+
+| Arquivo | Conteúdo | Rota |
+|---|---|---|
+| `dados_interface/planilha_estoque.xls` | O WMS que estava publicado **quando o SINGRA começou a extrair** | `/api/planilhas/wms-par` |
+| `dados_interface/planilha_rms_unificada.csv` | O SINGRA desse ciclo | `/api/planilhas/singra-par` |
+
+O WMS do par é o do início da extração (e não o do fim) de propósito: o erro que se quer evitar é o WMS estar à frente do
+SINGRA, e um WMS mais velho que o SINGRA nunca produz esse falso positivo. O robô não reenvia dados para montar o par: o
+commit só aponta para arquivos que já existem no repositório (ver o README do RPA).
+
+`hooks/useParInterface.js` carrega o par **depois** da carga normal (não atrasa as outras abas) e o guarda no IndexedDB
+(chave `supplyPar`), validado pelo SHA (`X-Blob-Sha`) e pelo `Last-Modified` de cada metade. A hora de cada metade vem do
+`atualizado.json` (chave = caminho, ex.: `dados_interface/planilha_estoque.xls`) e aparece numa faixa no topo da aba.
+
+| Estado | O que a aba faz |
+|---|---|
+| `idle` / `loading` | Mostra "Carregando…" e **não** a lista (ela ainda estaria no WMS ao vivo) |
+| `ok` | Cruza o par; faixa azul "Dados do mesmo momento: WMS de … × SINGRA de …" |
+| `indisponivel` | O robô ainda não publicou o par (404) ou ele veio vazio: cai para WMS/SINGRA ao vivo, com faixa amarela avisando que pode haver divergência que é só defasagem |
+
+Só o hook `useInterfaceAnalysis` recebe o par; ele alimenta a aba Interface, os cartões que dependem do cruzamento na aba
+Indicadores, os alertas de risco e a análise de IA. As demais abas continuam com o WMS ao vivo (5 min). Busca por e-mail e
+Fila em processamento também cruzam com o SINGRA, mas mostram situação (não apontam falha), então seguem ao vivo.
+
 ## O que vem do SINGRA
 
 CSV separado por `;`, lido em `utils/spreadsheet.js → fetchSingraOnly`.

@@ -13,9 +13,9 @@ export const normalizeKeys = (item) => {
   return newItem;
 };
 
-export const fetchSingraOnly = async () => {
+export const fetchSingraOnly = async (url = SINGRA_URL) => {
   try {
-    const res = await fetch(`${SINGRA_URL}?t=${Date.now()}`);
+    const res = await fetch(`${url}?t=${Date.now()}`);
     if (!res.ok) return [];
     const text = await res.text();
     let json = [];

@@ -3,6 +3,11 @@ export const XLSX_SCRIPT_URL = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist
 // função do servidor em api/planilhas/[arquivo].js (o token não vem ao navegador).
 export const WMS_URL = "/api/planilhas/wms";
 export const SINGRA_URL = "/api/planilhas/singra";
+// Par da interface: o WMS do instante em que o robô começou a ler o SINGRA + o SINGRA desse ciclo.
+// O WMS é atualizado a cada ~5 min e o SINGRA a cada ~30; a aba Interface SINGRA x WMS compara os dois e, com o WMS
+// "ao vivo", acusaria divergências que são só defasagem. Ver hooks/useParInterface.js.
+export const WMS_PAR_URL = "/api/planilhas/wms-par";
+export const SINGRA_PAR_URL = "/api/planilhas/singra-par";
 
 // --- MAPEAMENTO PADRÃO DE CORES POR STATUS ---
 export const STATUS_COLOR_MAP = {

@@ -128,8 +128,12 @@ Fila em aberto na visão do dashboard: tudo que **não** está `EXPEDIDO` nem
 
 ## Aba Interface SINGRA x WMS (`InterfaceTab`)
 
-Hook: `useInterfaceAnalysis(data, singraData)`. Confronta os dois sistemas
-RM a RM e separa em quatro grupos:
+Hook: `useInterfaceAnalysis(data, singraData)`, alimentado com o **par** WMS x
+SINGRA do mesmo momento (`useParInterface`; ver
+[03 — Fontes de dados](03-fontes-de-dados.md#par-wms-x-singra-aba-interface)).
+Sem o par, o WMS (5 min) estaria à frente do SINGRA (~30 min) e a lista traria
+divergências que são só defasagem. A faixa no topo da aba mostra a hora de cada
+metade. Confronta os dois sistemas RM a RM e separa em quatro grupos:
 
 | Grupo | Significa |
 |---|---|

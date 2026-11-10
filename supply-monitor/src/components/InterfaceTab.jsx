@@ -1,13 +1,54 @@
-import { ArrowRightLeft, Download } from 'lucide-react';
+import { ArrowRightLeft, Download, Link2, AlertTriangle, Loader2 } from 'lucide-react';
 import { safeGetISODate } from '../utils/dates';
+import { formatarHoraPar } from '../hooks/useParInterface';
 import InfoButton from './InfoButton';
+
+// Diz de quando são os dados que estão sendo cruzados. O WMS é atualizado a cada ~5 min e o SINGRA a cada ~30:
+// com o WMS "ao vivo", tudo que um operador mexeu desde a última leitura do SINGRA aparece como falha sem ser.
+// Por isso a lista usa o par (WMS do instante em que o SINGRA começou a ser lido) e esta faixa mostra a hora de cada
+// metade. Se o robô ainda não publicou o par, a lista cai para o ao vivo e a faixa avisa.
+const FaixaDoPar = ({ parInfo }) => {
+  if (!parInfo) return null;
+  if (parInfo.status === 'ok') {
+    return (
+      <div className="flex items-start gap-2 mb-6 px-4 py-3 rounded-2xl bg-indigo-50 border border-indigo-100 text-xs text-indigo-800">
+        <Link2 size={16} className="mt-0.5 shrink-0" />
+        <p>
+          <span className="font-black">Dados do mesmo momento:</span>{' '}
+          WMS de <span className="font-black">{formatarHoraPar(parInfo.wmsMod) || '—'}</span> × SINGRA de <span className="font-black">{formatarHoraPar(parInfo.singraMod) || '—'}</span>.{' '}
+          O SINGRA é lido a cada ~30 min; o WMS usado aqui é o de quando essa leitura começou, para não acusar como falha o que o SINGRA ainda não tinha recebido.
+        </p>
+      </div>
+    );
+  }
+  if (parInfo.status === 'indisponivel') {
+    return (
+      <div className="flex items-start gap-2 mb-6 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+        <p>
+          <span className="font-black">Par WMS × SINGRA indisponível.</span>{' '}
+          Esta lista usa o WMS mais recente com o último SINGRA, então pode conter divergências que são só defasagem entre as duas atualizações. Confira de novo no próximo ciclo antes de agir.
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 // Mostra apenas as falhas de interface (divergências onde o status do WMS
 // e do SINGRA não coincidem logicamente). As demais situações de
 // acompanhamento (aguardando retirada, aguardando arrecadação OMS,
 // arrecadado pela OMS) ficam na aba de Indicadores.
-const InterfaceTab = ({ interfaceAnalysis, selectedErrorFilter, setSelectedErrorFilter, handleDownloadExcel }) => {
+const InterfaceTab = ({ interfaceAnalysis, selectedErrorFilter, setSelectedErrorFilter, handleDownloadExcel, parInfo }) => {
   if (!interfaceAnalysis) return null;
+  // Até o par chegar a análise ainda está com o WMS ao vivo: não mostra a lista, para ninguém agir em cima de falha falsa.
+  if (parInfo && (parInfo.status === 'idle' || parInfo.status === 'loading')) {
+    return (
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-center gap-3 text-sm text-slate-500 py-20">
+        <Loader2 size={18} className="animate-spin" /> Carregando o WMS e o SINGRA do mesmo momento…
+      </div>
+    );
+  }
   const currentList = interfaceAnalysis.falhasInterface;
   const displayedList = selectedErrorFilter
     ? currentList.filter(item => `${item.STATUS || 'N/A'}-${item.singraStatus || 'N/A'}` === selectedErrorFilter)
@@ -23,6 +64,7 @@ const InterfaceTab = ({ interfaceAnalysis, selectedErrorFilter, setSelectedError
           </h3>
           <button onClick={() => handleDownloadExcel(displayedList, 'Falhas_Interface')} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-indigo-100 transition-colors shadow-sm"><Download size={16} /> Exportar Excel</button>
         </div>
+        <FaixaDoPar parInfo={parInfo} />
         {currentList.length === 0 ? (
           <p className="text-sm text-slate-400 italic text-center py-10">Nenhuma falha de interface identificada.</p>
         ) : (
